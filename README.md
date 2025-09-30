@@ -10,6 +10,6 @@ To collect course notes weekly.
 
 # Participant
 - Duygu Cakir
-- Ipek Kospi
+- Ipek Kaspi
 - Aysugul Yavuz
 - Makbule Ozge Ozler
