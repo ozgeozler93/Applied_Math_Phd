@@ -2,6 +2,11 @@
 
 ## 📚 Okunacak Kaynaklar (Nice to Read)
 
+### Attention is all you need
+LLM'lerin 'attention' ile çalışma mantığı
+**Link:**
+https://proceedings.neurips.cc/paper/2017/file/3f5ee243547dee91fbd053c1c4a845aa-Paper.pdf
+
 ### Gary Marcus - Neurosymbolic AI'ın Geleceği
 **Link:** https://garymarcus.substack.com/p/alphaproof-alphageometry-chatgpt
 
