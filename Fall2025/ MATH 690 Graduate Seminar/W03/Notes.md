@@ -166,17 +166,17 @@
 
 2. **🖥️ Arayüz (Interface)**
    - Kullanıcının sistemle etkileşime girdiği katman
-   - *Örnek: Kline (web uygulaması)*
+   - *Örnek: Cline (web uygulaması)*
 
 3. **🤖 LLM**
    - "Orkestra şefi" görevi
    - İstekleri işler, araçları çağırır, süreci yönetir
-   - *Örnek: ChatGPT*
+   - *Örnek: ChatGPT, Claude.ai*
 
 4. **🔧 Ortam (Environment)**
    - Kod çalıştırma, dosya arama gibi işlemlerin yapıldığı alan
    - Sonuçların gözlemlendiği yer
-   - *Örnek: VS Code*
+   - *Örnek: VS Code, Cursor*
 
 **İletişim Akışı:**
 Sorgu → Netleştirme → Kod Yazma → Test Etme → Sonuçları Gösterme
