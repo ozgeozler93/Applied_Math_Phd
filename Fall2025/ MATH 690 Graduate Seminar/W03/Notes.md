@@ -193,12 +193,18 @@ Bu ders, LLM'lerle etkili çalışmanın temel prensiplerini kapsıyor. Zero-sho
 
 ## 📖 Gelecek Hafta İçin Yapılacaklar
 
-Birkaç litellm kodu denenecek, github'a atılacak. 
-Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. 
-Örnek proje konusu: Finansal advisor, seyahat planlayıcısı... 
+1- Birkaç litellm kodu denenecek, github'a atılacak. 
+2- Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. Ve takimlara ayrilacagiz.
+Örnek proje konusu: Finansal advisor, seyahat planlayıcısı... Matematikde proof checking yapma konusu biraz teorik kisimla bizi ugrastirabilecegi icin oncelikli olarak onerilmedi. Daha cok ugrasmamiz istenilen uygulamada pratik kazanmamizdi.
 
 > 🎯 *Chip Huyen praktik ML konularında çok iyi kaynaklar üretiyor. Bu yazıda muhtemelen agent'ların mimari tasarımı, kullanım senaryoları ve implementation challenges ele alınıyor.*
 
 
+## 📖 Gelecek Hafta Islenecek Konular
+ - Pratikte Agentic Ai nasil yapiliyor?
+
+
+
 *Son güncelleme: 10 Ekim 2025*
+*Son guncelleme: [@ozgeozler93]*
 
