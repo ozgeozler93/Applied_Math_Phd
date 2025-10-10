@@ -69,7 +69,7 @@
 - Çıktı kalitesi ve formatı örneklere göre şekillenir
 - Özellikle spesifik format istenen durumlarda etkili
 
-Hocanin bahsettigi ornek: ChatGPT'e ve Claude'a verilen ayni promptlar (mesela "Sen bi Market Expert'sin, akilli saatleri pazarlayacak reklam metni hazirla") sonucunda farkli sonuclar alinabilir. Ama bu durum cok istenen bir durum olmadiginda, bu belirsizligi azaltabilmek icin belli cikti ornekleri model ile paylasilabilir. Orneklerin saglandigindaki uygulamaya da few-shot learning denir. (Modele, ciktida gormek istedigimiz sey hakkinda herhangi bir ornek verilmediginde, sadece kurallar listesi verildiginde takip ettigimiz uygulama zero-shot learning denir.)
+Hocanin bahsettigi ornek: ChatGPT'e ve Claude'a verilen ayni promptlar (mesela "Sen bi Market Expert'sin, akilli saatleri pazarlayacak reklam metni hazirla") sonucunda farkli sonuclar alinabilir. Ama bu durum cok istenen bir durum olmadiginda, bu belirsizligi azaltabilmek icin belli cikti ornekleri model ile paylasilabilir. Orneklerin saglandigi uygulamaya da few-shot learning denir. (Modele, ciktida gormek istedigimiz sey hakkinda herhangi bir ornek verilmediginde, sadece kurallar listesi verildiginde takip ettigimiz uygulama zero-shot learning denir.)
 
 
 ---
