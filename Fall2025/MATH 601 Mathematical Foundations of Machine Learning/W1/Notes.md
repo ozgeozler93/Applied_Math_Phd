@@ -1,2 +1,2 @@
-# Book resource
+# Resource
 https://sites.google.com/bc.edu/eli-grigsby/mt875-mechanistic-interpretability
