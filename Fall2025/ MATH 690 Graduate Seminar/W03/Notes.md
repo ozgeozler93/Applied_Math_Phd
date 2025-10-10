@@ -15,20 +15,36 @@
 
 ## 📝 Ders İçeriği
 
+### Bir Prompt'un anatomisi
+
+1- Identity
+2- Goal/Target
+3- Control
+4- Tone
+5- Format
+
 ### 5. Slayt: LLM'leri Kod İçinde Kullanma
 
 **Konu:** Python ile LLM API'lerine nasıl istek gönderilir?
 
 **Önemli Noktalar:**
-- `litellm` kütüphanesi kullanılarak Gemini modeline örnek istek
+- `litellm` kütüphanesi kullanılarak Gemini modeline örnek istek (`litellm` kütüphanesi herhangi bir LLM kutuphanesini kullanmamiza izin veriyor. Tek bir dejavantaji var, her LLM'deki detay ozellikleri calistirmayabiliyor.)
+
+- LLM'lerde hyperparameterlar fazla degildir. Gunumuzde degeri ile oynanabilen tek hyperparameter: "Temperature". Baksa hyperparameterler de olsa gunumuzde cok gecerlilikleri bulunmuyor.  
+  
 - **Üç temel rol:**
   1. **System (Sistem):** Modelin genel davranış talimatları
   2. **User (Kullanıcı):** Son kullanıcıdan gelen sorgu/komut
   3. **Assistant (Asistan):** Modelin ürettiği yanıt
+ 
+  (LLM'e kullanici tarafinda soru soruldugunda, daha cok asistan ve kullanici birbirleri ile konusuyor oluyor cunku, asistan hatirlatici gorevdedir. )
 
 **Temperature Parametresi:**
-- **Yüksek değer:** Daha yaratıcı, geniş bir seçenek yelpazesi
-- **Düşük değer:** Daha deterministik, net ve kesin cevaplar
+- Opsiyonel bir parametredir.
+- Tempereture degeri genelde 0-1 arasinda deger aliyor. (Gecen sene, Gemini Ai, 0-2 arasinda olan versiyonunu sunmus.)
+- **Yüksek değer:** Daha yaratıcı, geniş bir seçenek yelpazesi. Bir baska deyisle, 1.0'a yakin secilmesi tamamen LLM'in kendi tercihlere gore sectigi kelimenin secilmesi demek
+- **Düşük değer:** Daha deterministik, net ve kesin cevaplar. Baska bir deyisle, bir sonraki kelime tahmininde en yuksek olasilikli kelimenin secilmesi (deterministiklik soz konusu yani) demek.
+- Mesela, 0.7 degerinin secildiginde biraz daha random secim soz konusudur.
 - *💡 İlginç not: Yeni nesil modeller o kadar güçlü ki, bu parametrenin önemi azalıyor*
 
 ---
