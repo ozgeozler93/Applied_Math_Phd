@@ -69,6 +69,9 @@
 - Çıktı kalitesi ve formatı örneklere göre şekillenir
 - Özellikle spesifik format istenen durumlarda etkili
 
+Hocanin bahsettigi ornek: ChatGPT'e ve Claude'a verilen ayni promptlar (mesela "Sen bi Market Expert'sin, akilli saatleri pazarlayacak reklam metni hazirla") sonucunda farkli sonuclar alinabilir. Ama bu durum cok istenen bir durum olmadiginda, bu belirsizligi azaltabilmek icin belli cikti ornekleri model ile paylasilabilir. Orneklerin saglandigindaki uygulamaya da few-shot learning denir. (Modele, ciktida gormek istedigimiz sey hakkinda herhangi bir ornek verilmediginde, sadece kurallar listesi verildiginde takip ettigimiz uygulama zero-shot learning denir.)
+
+
 ---
 
 ### 8. Slayt: Chain of Thought (CoT) - Düşünce Zinciri
@@ -80,11 +83,16 @@
 - Basit örneklerle açıklanamayan durumlar
 - Yüksek kaliteli ve doğru sonuç gerektiğinde
 
+
 **Yapı:**
 1. **Akıl Yürütme (Reasoning):** Modelin düşünce süreci
 2. **Nihai Açıklama (Final Answer):** Son cevap
 
 *💡 Model kendi kendine konuşarak en doğru sonuca ulaşır*
+
+
+
+Hocanin bahsettigi ornek: Bir LLM'e ayakkabi pazarlamacisi ya da saat pazarlamacisi ayrimini belirtmeden her tur urun icin, uygun yaklasimla reklam metni yazmasini istersek. Yani, LLM'e sana bir surec veriyorum, sen bu sureci dusun ve en sonunda da - kiminle, nasil, ne konuda, kullanicin verecegi yanita da dusunerek- genellemeyi kendin yap demis oluyoruz. Baska bir tabirle, LLM'e alan tanimis oluyoruz.
 
 ---
 
