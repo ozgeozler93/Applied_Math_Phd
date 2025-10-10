@@ -9,7 +9,7 @@ To collect course notes weekly.
 - MATH 690 Graduate Seminar / Dr. Erdem ÖZCAN / (Friday @11:00 Online - Zoom)
 
 # Participant
-- Aysegul Yavuz
-- Duygu Cakir
+- Aysegul Yavuz 
+- Duygu Cakir [duygucakir]
 - Ipek Kaspi
-- Makbule Ozge Ozler
+- Makbule Ozge Ozler [ozgeozler93]
