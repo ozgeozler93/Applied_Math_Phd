@@ -30,7 +30,7 @@
 **Önemli Noktalar:**
 - `litellm` kütüphanesi kullanılarak Gemini modeline örnek istek (`litellm` kütüphanesi herhangi bir LLM kutuphanesini kullanmamiza izin veriyor. Tek bir dejavantaji var, her LLM'deki detay ozellikleri calistirmayabiliyor.)
 
-- LLM'lerde hyperparameterlar fazla degildir. Gunumuzde degeri ile oynanabilen tek hyperparameter: "Temperature". Baksa hyperparameterler de olsa gunumuzde cok gecerlilikleri bulunmuyor.  
+- LLM'lerde hyperparameterlar fazla degildir. Gunumuzde degeri ile oynanabilen tek hyperparameter: "Temperature". Baska hyperparameterler de olsa gunumuzde cok gecerlilikleri bulunmuyor.
   
 - **Üç temel rol:**
   1. **System (Sistem):** Modelin genel davranış talimatları
