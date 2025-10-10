@@ -41,8 +41,8 @@
 
 **Temperature Parametresi:**
 - Opsiyonel bir parametredir.
-- Tempereture degeri genelde 0-1 arasinda deger aliyor. (Gecen sene, Gemini Ai, 0-2 arasinda olan versiyonunu sunmus.)
-- **Yüksek değer:** Daha yaratıcı, geniş bir seçenek yelpazesi. Bir baska deyisle, 1.0'a yakin secilmesi tamamen LLM'in kendi tercihlere gore sectigi kelimenin secilmesi demek
+- Tempereture parametresi genelde 0-1 arasinda deger alir. (Gecen sene, Gemini Ai, 0-2 arasinda olan versiyonunu sunmus.)
+- **Yüksek değer:** Daha yaratıcı, geniş bir seçenek yelpazesi. Bir baska deyisle, 1.0'a yakin secilmesi tamamen LLM'in kendi tercihlere gore sectigi kelimenin secilmesi demek.
 - **Düşük değer:** Daha deterministik, net ve kesin cevaplar. Baska bir deyisle, bir sonraki kelime tahmininde en yuksek olasilikli kelimenin secilmesi (deterministiklik soz konusu yani) demek.
 - Mesela, 0.7 degerinin secildiginde biraz daha random secim soz konusudur.
 - *💡 İlginç not: Yeni nesil modeller o kadar güçlü ki, bu parametrenin önemi azalıyor*
