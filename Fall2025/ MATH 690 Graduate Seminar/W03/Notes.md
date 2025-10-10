@@ -189,5 +189,16 @@ Sorgu → Netleştirme → Kod Yazma → Test Etme → Sonuçları Gösterme
 
 Bu ders, LLM'lerle etkili çalışmanın temel prensiplerini kapsıyor. Zero-shot'tan başlayıp reasoning modellere, oradan da tool calling ve MCP standardına kadar giden bir yolculuk. En önemli çıkarım: LLM'ler artık sadece metin üreten araçlar değil, dış dünyayla etkileşime girebilen, araçları kullanabilen ve sistemik düşünebilen platformlar haline geliyor.
 
+---
+
+## 📖 Gelecek Hafta İçin Yapılacaklar
+
+Birkaç litellm kodu denenecek, github'a atılacak. 
+Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. 
+Örnek proje konusu: Finansal advisor, seyahat planlayıcısı... 
+
+> 🎯 *Chip Huyen praktik ML konularında çok iyi kaynaklar üretiyor. Bu yazıda muhtemelen agent'ların mimari tasarımı, kullanım senaryoları ve implementation challenges ele alınıyor.*
+
+
 *Son güncelleme: 10 Ekim 2025*
 
