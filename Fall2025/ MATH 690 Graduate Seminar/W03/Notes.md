@@ -17,11 +17,11 @@
 
 ### Bir Prompt'un anatomisi
 
-1- Identity
-2- Goal/Target
-3- Control
-4- Tone
-5- Format
+- 1- Identity
+- 2- Goal/Target
+- 3- Control
+- 4- Tone
+- 5- Format
 
 ### 5. Slayt: LLM'leri Kod İçinde Kullanma
 
