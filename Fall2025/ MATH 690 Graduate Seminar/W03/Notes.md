@@ -122,6 +122,8 @@
 
 **Tanım:** LLM'lerin dış kaynaklara ve araçlara erişimi
 
+LLM'lerin hafizasi, internette olan her bilgiyi barindirir. Ama internetteki her bilgi guncel degildir hem de yanlis olabilir. Dogru ve guncel bilgiye ulasmak icin dis kaynaklara erismesi gerekebilir.
+
 **Ne Yapabilir:**
 - Arama motorlarından güncel bilgi alabilir
 - API'lar ve veritabanlarıyla iletişim kurabilir
@@ -134,6 +136,9 @@
 3. `<tool_call>` etiketi içinde araç çağırma komutu üretir
 
 *💡 Bu sayede LLM, kendi bilgi sınırlarının ötesine geçebiliyor*
+
+
+Antropic, bu islemlerin nasil olmasi gerektigini dusunmus, standirze etmis. MCP server araci cikmis. Daha sonra diger sirketler de bu standizasyonu benimsemis.
 
 ---
 
@@ -193,9 +198,9 @@ Bu ders, LLM'lerle etkili çalışmanın temel prensiplerini kapsıyor. Zero-sho
 
 ## 📖 Gelecek Hafta İçin Yapılacaklar
 
-1- Birkaç litellm kodu denenecek, github'a atılacak. 
-2- Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. Ve takimlara ayrilacagiz.
-Örnek proje konusu: Finansal advisor, seyahat planlayıcısı... Matematikde proof checking yapma konusu biraz teorik kisimla bizi ugrastirabilecegi icin oncelikli olarak onerilmedi. Daha cok ugrasmamiz istenilen uygulamada pratik kazanmamizdi.
+- "litellm" kütüphanesi kulanan birkac tane deneme uygulama denenecek, github'a atılacak. 
+- Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. Ve takimlara ayrilacagiz.
+Örnek proje konusu: Finansal advisor, seyahat planlayıcısı, hocanin derste bahsettigi gibi cesitli kaynaklardan urun tavsiyesi alip urun tavsiye eden uygulama... Matematikde proof checking yapma konusu biraz teorik kisimla bizi ugrastirabilecegi icin oncelikli olarak onerilmedi. Daha cok ugrasmamiz istenilen, uygulamada pratik kazanmamizdi.
 
 > 🎯 *Chip Huyen praktik ML konularında çok iyi kaynaklar üretiyor. Bu yazıda muhtemelen agent'ların mimari tasarımı, kullanım senaryoları ve implementation challenges ele alınıyor.*
 
