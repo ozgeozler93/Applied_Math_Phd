@@ -37,7 +37,7 @@
   2. **User (Kullanıcı):** Son kullanıcıdan gelen sorgu/komut
   3. **Assistant (Asistan):** Modelin ürettiği yanıt
  
-  (LLM'e kullanici tarafinda soru soruldugunda, daha cok asistan ve kullanici birbirleri ile konusuyor oluyor cunku, asistan hatirlatici gorevdedir. )
+  (LLM'e kullanici tarafinda soru soruldugunda, daha cok asistan ve kullanici birbirleri ile konusuyor oluyor, cunku asistan hatirlatici gorevdedir. )
 
 **Temperature Parametresi:**
 - Opsiyonel bir parametredir.
