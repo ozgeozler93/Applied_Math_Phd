@@ -198,7 +198,7 @@ Bu ders, LLM'lerle etkili çalışmanın temel prensiplerini kapsıyor. Zero-sho
 
 ## 📖 Gelecek Hafta İçin Yapılacaklar
 
-- "litellm" kütüphanesi kulanan birkac tane deneme uygulama denenecek, github'a atılacak. 
+- `litellm` kütüphanesi kulanan birkac tane deneme uygulama denenecek, github'a atılacak. 
 - Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. Ve takimlara ayrilacagiz.
 Örnek proje konusu: Finansal advisor, seyahat planlayıcısı, hocanin derste bahsettigi gibi cesitli kaynaklardan urun tavsiyesi alip urun tavsiye eden uygulama... Matematikde proof checking yapma konusu biraz teorik kisimla bizi ugrastirabilecegi icin oncelikli olarak onerilmedi. Daha cok ugrasmamiz istenilen, uygulamada pratik kazanmamizdi.
 
