@@ -138,7 +138,7 @@ LLM'lerin hafizasi, internette olan her bilgiyi barindirir. Ama internetteki her
 *💡 Bu sayede LLM, kendi bilgi sınırlarının ötesine geçebiliyor*
 
 
-Antropic, bu islemlerin nasil olmasi gerektigini dusunmus, standirze etmis. MCP server araci cikmis. Daha sonra diger sirketler de bu standizasyonu benimsemis.
+Antropic, bu islemlerin nasil olmasi gerektigini dusunmus, standardize etmis. MCP server araci cikmis. Daha sonra diger sirketler de bu standizasyonu benimsemis.
 
 ---
 
