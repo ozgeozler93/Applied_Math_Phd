@@ -1,6 +1,7 @@
 # GSÜ LLM Ödev 1 - Prompting Teknikleri Raporu
 
 **Öğrenci Ismi Soyismi:** Makbule Özge Özler
+
 **Tarih:** 11 Ekim 2025
 
 ---
