@@ -1,1 +1,0 @@
-Bu hafta derse katilamadim. [@ozgeozler93]
