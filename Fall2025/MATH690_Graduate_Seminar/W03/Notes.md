@@ -1,9 +1,9 @@
 # LLM Prompting ve Araç Kullanımı - Ders Notları
 
-## 📚 Okuma Listem
+## 📚 Okuma Listemiz
 
 ### Must-Read
-- **On the Biology of a Large Language Model** (2 hafta sonraya ertelendi)
+- **On the Biology of a Large Language Model** (2 hafta sonraya okunacak, hemen bu hafta değil)
   - Kaynak: https://transformer-circuits.pub/2025/attribution-graphs/biology.html
 
 ### Nice-to-Read
@@ -15,20 +15,36 @@
 
 ## 📝 Ders İçeriği
 
+### Bir Prompt'un anatomisi
+
+- 1- Identity
+- 2- Goal/Target
+- 3- Control
+- 4- Tone
+- 5- Format
+
 ### 5. Slayt: LLM'leri Kod İçinde Kullanma
 
 **Konu:** Python ile LLM API'lerine nasıl istek gönderilir?
 
 **Önemli Noktalar:**
-- `litellm` kütüphanesi kullanılarak Gemini modeline örnek istek
+- `litellm` kütüphanesi kullanılarak Gemini modeline örnek istek (`litellm` kütüphanesi herhangi bir LLM kutuphanesini kullanmamiza izin veriyor. Tek bir dejavantaji var, her LLM'deki detay ozellikleri calistirmayabiliyor.)
+
+- LLM'lerde hyperparameterlar fazla degildir. Gunumuzde degeri ile oynanabilen tek hyperparameter: "Temperature". Baska hyperparameterler de olsa gunumuzde cok gecerlilikleri bulunmuyor.
+  
 - **Üç temel rol:**
   1. **System (Sistem):** Modelin genel davranış talimatları
   2. **User (Kullanıcı):** Son kullanıcıdan gelen sorgu/komut
   3. **Assistant (Asistan):** Modelin ürettiği yanıt
+ 
+  (LLM'e kullanici tarafinda soru soruldugunda, daha cok asistan ve kullanici birbirleri ile konusuyor oluyor, cunku asistan hatirlatici gorevdedir. )
 
 **Temperature Parametresi:**
-- **Yüksek değer:** Daha yaratıcı, geniş bir seçenek yelpazesi
-- **Düşük değer:** Daha deterministik, net ve kesin cevaplar
+- Opsiyonel bir parametredir.
+- Tempereture parametresi genelde 0-1 arasinda deger alir. (Gecen sene, Gemini Ai, 0-2 arasinda olan versiyonunu sunmus.)
+- **Yüksek değer:** Daha yaratıcı, geniş bir seçenek yelpazesi. Bir baska deyisle, 1.0'a yakin secilmesi tamamen LLM'in kendi tercihlere gore sectigi kelimenin secilmesi demek.
+- **Düşük değer:** Daha deterministik, net ve kesin cevaplar. Baska bir deyisle, bir sonraki kelime tahmininde en yuksek olasilikli kelimenin secilmesi (deterministiklik soz konusu yani) demek.
+- Mesela, 0.7 degerinin secildiginde biraz daha random secim soz konusudur.
 - *💡 İlginç not: Yeni nesil modeller o kadar güçlü ki, bu parametrenin önemi azalıyor*
 
 ---
@@ -53,6 +69,9 @@
 - Çıktı kalitesi ve formatı örneklere göre şekillenir
 - Özellikle spesifik format istenen durumlarda etkili
 
+Hocanin bahsettigi ornek: ChatGPT'e ve Claude'a verilen ayni promptlar (mesela "Sen bi Market Expert'sin, akilli saatleri pazarlayacak reklam metni hazirla") sonucunda farkli sonuclar alinabilir. Ama bu durum cok istenen bir durum olmadiginda, bu belirsizligi azaltabilmek icin belli cikti ornekleri model ile paylasilabilir. Orneklerin saglandigi uygulamaya da few-shot learning denir. (Modele, ciktida gormek istedigimiz sey hakkinda herhangi bir ornek verilmediginde, sadece kurallar listesi verildiginde takip ettigimiz uygulama zero-shot learning denir.)
+
+
 ---
 
 ### 8. Slayt: Chain of Thought (CoT) - Düşünce Zinciri
@@ -64,11 +83,16 @@
 - Basit örneklerle açıklanamayan durumlar
 - Yüksek kaliteli ve doğru sonuç gerektiğinde
 
+
 **Yapı:**
 1. **Akıl Yürütme (Reasoning):** Modelin düşünce süreci
 2. **Nihai Açıklama (Final Answer):** Son cevap
 
 *💡 Model kendi kendine konuşarak en doğru sonuca ulaşır*
+
+
+
+Hocanin bahsettigi ornek: Bir LLM'e ayakkabi pazarlamacisi ya da saat pazarlamacisi ayrimini belirtmeden her tur urun icin, uygun yaklasimla reklam metni yazmasini istersek. Yani, LLM'e sana bir surec veriyorum, sen bu sureci dusun ve en sonunda da - kiminle, nasil, ne konuda, kullanicin verecegi yanita da dusunerek- genellemeyi kendin yap demis oluyoruz. Baska bir tabirle, LLM'e alan tanimis oluyoruz.
 
 ---
 
@@ -122,6 +146,8 @@
 
 **Tanım:** LLM'lerin dış kaynaklara ve araçlara erişimi
 
+LLM'lerin hafizasi, internette olan her bilgiyi barindirir. Ama internetteki her bilgi guncel degildir hem de yanlis olabilir. Dogru ve guncel bilgiye ulasmak icin dis kaynaklara erismesi gerekebilir.
+
 **Ne Yapabilir:**
 - Arama motorlarından güncel bilgi alabilir
 - API'lar ve veritabanlarıyla iletişim kurabilir
@@ -134,6 +160,9 @@
 3. `<tool_call>` etiketi içinde araç çağırma komutu üretir
 
 *💡 Bu sayede LLM, kendi bilgi sınırlarının ötesine geçebiliyor*
+
+
+Antropic, bu islemlerin nasil olmasi gerektigini dusunmus, standardize etmis. MCP server araci cikmis. Daha sonra diger sirketler de bu standizasyonu benimsemis.
 
 ---
 
@@ -193,9 +222,9 @@ Bu ders, LLM'lerle etkili çalışmanın temel prensiplerini kapsıyor. Zero-sho
 
 ## 📖 Gelecek Hafta İçin Yapılacaklar
 
-1- Birkaç litellm kodu denenecek, github'a atılacak. 
-2- Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. Ve takimlara ayrilacagiz.
-Örnek proje konusu: Finansal advisor, seyahat planlayıcısı... Matematikde proof checking yapma konusu biraz teorik kisimla bizi ugrastirabilecegi icin oncelikli olarak onerilmedi. Daha cok ugrasmamiz istenilen uygulamada pratik kazanmamizdi.
+- `litellm` kütüphanesi kulanan birkac tane deneme uygulama denenecek, github'a atılacak. 
+- Proje konusu düşünmeye başlayacağız. Sonraki hafta da proje üzerinde çalışmaya başlayacağız. Ve takimlara ayrilacagiz.
+Örnek proje konusu: Finansal advisor, seyahat planlayıcısı, hocanin derste bahsettigi gibi cesitli kaynaklardan urun tavsiyesi alip urun tavsiye eden uygulama... Matematikde proof checking yapma konusu biraz teorik kisimla bizi ugrastirabilecegi icin oncelikli olarak onerilmedi. Daha cok ugrasmamiz istenilen, uygulamada pratik kazanmamizdi.
 
 > 🎯 *Chip Huyen praktik ML konularında çok iyi kaynaklar üretiyor. Bu yazıda muhtemelen agent'ların mimari tasarımı, kullanım senaryoları ve implementation challenges ele alınıyor.*
 
