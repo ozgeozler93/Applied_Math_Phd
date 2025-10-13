@@ -16,3 +16,21 @@ venv/
 # Secrets
 .env
 *.env
+
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Editor
+.vscode/
+
+# Secrets
+.env
+*.env
