@@ -10,7 +10,7 @@ def analyze_sentiment(text):
     """
     try:
         resp = completion(
-            model="gemini/gemini-2.0-flash-exp",
+            model="anthropic/claude-3-5-haiku-latest",
             messages=[
                 {
                     "role": "system",
@@ -38,7 +38,7 @@ def analyze_sentiment(text):
                 }
             ],
             temperature=0.2,
-            api_key=os.getenv("GEMINI_API_KEY")
+            api_key=os.getenv("ANTHROPIC_API_KEY")
         )
         
         result = resp["choices"][0]["message"]["content"]

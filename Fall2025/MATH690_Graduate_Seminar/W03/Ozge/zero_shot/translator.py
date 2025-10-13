@@ -1,13 +1,17 @@
 from litellm import completion
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
 # .env dosyasından API key'i yükle
+ENV_PATH = Path(__file__).resolve().parents[1] / ".env"  # -> Ozge/.env
+load_dotenv(ENV_PATH)
+
 load_dotenv()
 
 # API key'in yüklendiğini kontrol et
-if not os.getenv("GEMINI_API_KEY"):
-    print("HATA: .env dosyasında GEMINI_API_KEY bulunamadı!")
+if not os.getenv("ANTHROPIC_API_KEY"):
+    print("HATA: .env dosyasında ANTHROPIC_API_KEY bulunamadı!")
     exit()
 
 def translate_text(text, target_language):
@@ -16,7 +20,8 @@ def translate_text(text, target_language):
     """
     try:
         resp = completion(
-            model="gemini/gemini-2.0-flash-exp",
+            # model="gemini/gemini-2.0-flash-exp",
+            model="anthropic/claude-3-5-haiku-latest",
             messages=[
                 {
                     "role": "system",
@@ -28,7 +33,7 @@ def translate_text(text, target_language):
                 }
             ],
             temperature=0.3,  # Düşük temperature = daha tutarlı sonuç
-            api_key=os.getenv("GEMINI_API_KEY")
+            api_key=os.getenv("ANTHROPIC_API_KEY")
         )
         
         return resp["choices"][0]["message"]["content"]
@@ -60,3 +65,5 @@ if __name__ == "__main__":
         translation = translate_text(text, lang)
         print(f"Translation({lang}) : {translation}")
         print("-" * 60)
+
+

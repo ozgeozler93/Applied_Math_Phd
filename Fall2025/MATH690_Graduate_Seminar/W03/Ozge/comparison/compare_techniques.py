@@ -11,13 +11,13 @@ def test_technique(technique_name, system_prompt, user_prompt, problem):
     
     try:
         resp = completion(
-            model="gemini/gemini-2.0-flash-exp",
+            model="anthropic/claude-3-5-haiku-latest",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt.format(problem=problem)}
             ],
             temperature=0.1,
-            api_key=os.getenv("GEMINI_API_KEY")
+            api_key=os.getenv("ANTHROPIC_API_KEY")
         )
         
         elapsed_time = time.time() - start_time

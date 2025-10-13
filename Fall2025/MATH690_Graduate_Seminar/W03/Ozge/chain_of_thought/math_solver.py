@@ -13,7 +13,7 @@ def solve_math_problem(problem):
         resp = completion(
             # model="gemini/gemini-2.0-flash-exp",  # Kota doldu
             # model="gemini/gemini-1.5-flash",
-            model="claude-3-5-haiku-20241022",  # ✅ DOĞRU MODEL
+            model="anthropic/claude-3-5-haiku-latest",  # ✅ DOĞRU MODEL
             # Alternatifler:
             # model="claude-3-5-sonnet-20241022"  # Daha güçlü ama pahalı
             # model="claude-3-haiku-20240307"     # Eski versiyon

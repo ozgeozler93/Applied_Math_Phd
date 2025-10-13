@@ -1,275 +1,243 @@
+
+-----------------------
+
 # GSÜ LLM Ödev 1 - Prompting Teknikleri Raporu
 
 **Öğrenci Ismi Soyismi:** Makbule Özge Özler
 
+**Öğrenci:** Makbule Özge Özler  
 **Tarih:** 11 Ekim 2025
 
 ---
 
 ## ÖZET
 
-Bu ödevde 4 farklı prompting tekniğini (Zero-Shot, Few-Shot, Chain-of-Thought, Tool Calling) pratikte deneyerek LLM'lerin nasıl yönlendirilebileceğini öğrendim. Aynı görevi farklı tekniklerle çözdüğümde hız, detay ve doğruluk açısından farklı sonuçlar elde ettim.
+Bu ödevde 4 farklı prompting tekniğini (Zero-Shot, Few-Shot, Chain-of-Thought, Tool Calling) pratikte deneyerek LLM'lerin nasıl yönlendirilebileceğini gözlemledim. Aynı görevi farklı tekniklerle çalıştırdığımda hız, detay ve doğruluk açısından belirgin farklar gördüm. CoT en detaylı ve güvenilir açıklamaları üretirken; Few-Shot genelde en hızlı/ucuz dengeyi sundu. Gerçek dünyaya yakın senaryolarda **Tool Calling** net şekilde öne çıktı.
+
+---
+
+## KULLANDIĞIM MODELLER
+
+> Anahtarlar **lokalde .env** içinde; rapora hiçbir secret eklenmedi.
+
+- **Anthropic**
+  - `claude-3-5-haiku-latest` (birincil; hızlı/ekonomik)
+  - `claude-3-5-sonnet-latest` (fallback; daha güçlü)
+- **Google Gemini**
+  - `gemini-2.0-flash-exp` (bazı denemelerde kullandım; **free-tier** günlük kotasına takılınca fallback’e geçtim)
+- **OpenAI**
+  - `gpt-4o-mini` (ek fallback; sınırlı test)
+
+**Neden bu seçim?**  
+Few-Shot/Zero-Shot için küçük ama stabil modeller yeterli. CoT/Reasoning ve Tool-Calling’de daha güçlü/kararlı modeller (sonnet) avantaj sağlıyor. Sağlayıcı yoğunluğu/429 gibi durumlara karşı **model fallback** ve **exponential backoff** ekledim.
 
 ---
 
 ## 1. ZERO-SHOT TEKNİĞİ
 
 ### Tanım
-Model'e hiç örnek vermeden, sadece talimat vererek görev yaptırma.
+Modele örnek vermeden, sadece talimatla görev yaptırma.
 
 ### Kullandığım Örnek
-**Program:** Çeviri Uygulaması (`translator.py`)
-**Görev:** Metinleri farklı dillere çevir
+**Program:** Çeviri Uygulaması (`zero_shot/translator.py`)  
+**Görev:** Metinleri farklı dillere çevir.
 
-### Test Sonuçları
+### Test Sonuçları (örnekler)
+- “Hello, how are you?” → **TR**: *Merhaba, nasılsın?*
+- “Das Wetter ist heute schön” → **EN**: *The weather is nice today.*
+- “今日はとても良い天気です” → **EN**: *Today is very nice weather.*
 
+> Not: Gemini free-tier kotası dolunca 429 aldı; otomatik olarak Anthropic/OpenAI fallback’e geçtim.
 
-### Gözlemlerim
-✅ **Avantajlar:**
-- Çok hızlı (kodlamak ve çalıştırmak kolay)
-- Basit görevlerde yeterli
-- Prompt kısa (az token = ucuz)
+### Gözlemler
+✅ Çok hızlı, basit işlerde yeterli.  
+❌ Karmaşık biçim/ton isteklerinde tutarsız kalabiliyor; “neden böyle yaptı?” takibi zor.
 
-❌ **Dezavantajlar:**
-- Karmaşık görevlerde tutarsız olabilir
-- Spesifik format istediğimizde zorlanıyor
-- Hata yaptığında neden yaptığını anlamak zor
+### Kod Çıktı Görseli
+![Zero-Shot örnek ekran görüntüsü](assets/zero-shot-demo.png)
 
-### Kod Konumu
-`zero_shot/translator.py`
+### En Zorlandığım Kısımlar
+- Prompt’u kısa tutarken hedef dil/biçimi netleştirmek.
+- Dil çiftine göre (TR→FR gibi) aksan/özel karakterlerin korunması.
 
 ---
 
 ## 2. FEW-SHOT TEKNİĞİ
 
 ### Tanım
-Model'e birkaç input-output örneği vererek nasıl davranması gerektiğini öğretme.
+Birkaç input-output örneğiyle model davranışını örnek üzerinden öğretme.
 
 ### Kullandığım Örnek
-**Program:** Sentiment Analizi (`sentiment_analyzer.py`)
-**Görev:** Türkçe yorumları Pozitif/Negatif/Nötr olarak sınıflandır
+**Program:** Duygu Analizi (`few_shot/sentiment_analyzer.py`)  
+**Görev:** Türkçe yorumları Pozitif/Negatif/Nötr etiketlemek.
 
-### Test Sonuçları
+### Test Sonuçları (örnekler)
+- “Ürün çok kaliteli…” → **Positive**  
+- “Hiç beğenmedim…” → **Negative**  
+- “İdare eder…” → **Neutral**  
+- “Kargo geç geldi ama ürün güzelmiş.” → **Negative** *(örnek bias’ından etkilendi)*
 
-### Gözlemlerim
-✅ **Avantajlar:**
-- Örneklerle daha tutarlı sonuçlar
-- Spesifik format/ton istediğimizde çok işe yarıyor
-- Zero-shot'a göre daha güvenilir
+### Gözlemler
+✅ Format/ton isteğinde çok tutarlı; Zero-Shot’tan daha güvenilir.  
+❌ Prompt uzuyor → token maliyeti artıyor. Örnek seçimi **kritik** (yanlı örnek = yanlı model).
 
-❌ **Dezavantajlar:**
-- Prompt uzunluğu arttı (daha fazla token → daha pahalı)
-- Örnek seçimi önemli (kötü örnekler → kötü sonuç)
+### Kod Çıktı Görseli
+![Few-Shot örnek ekran görüntüsü](assets/few-shot-demo.png)
 
-🔍 **İlginç Bulgu:**
-5. örnekte "Kargo geç geldi AMA ürün güzel" cümlesini Negative olarak sınıflandırdı. Neden? Çünkü verdiğim örneklerde "olumsuz" kelimeler gördüğünde Negative etiketlemeyi öğrendi.
-
-### Kod Konumu
-`few_shot/sentiment_analyzer.py`
+### En Zorlandığım Kısımlar
+- Örnek kürasyonu (bias).  
+- 3–5 örnek arasında denge (fazla örnek = pahalı / az örnek = yetersiz öğrenme).
 
 ---
 
 ## 3. CHAIN-OF-THOUGHT (CoT)
 
 ### Tanım
-Model'e "adım adım düşün" talimatı vererek reasoning (akıl yürütme) sürecini göstermesini sağlama.
+“Adım adım düşün” talimatıyla akıl yürütme sürecini görünür kılmak.
 
 ### Kullandığım Örnek
-**Program:** Matematik Problem Çözücü (`math_solver.py`)
-**Görev:** Kelime problemlerini adım adım çöz
+**Program:** Matematik Problemi Çözücü (`chain_of_thought/math_solver.py`)  
+**Görev:** Kelime problemlerini adım adım çözmek.
 
-### Test Sonuçları
+### Test Sonuçları (özet)
+- **Problem 1:** 3 tişört 240 TL → 7 tişört = **560 TL** (birim fiyat 80 TL hesaplandı)  
+- **Problem 2:** 150 TL bütçe; 3×45 + 5×12 = 195 TL → **para yetmiyor, -45 TL**  
+- **Problem 3:** 48 kurabiye / 6 kutu → **8** kurabiye/ kutu
 
-#### Problem 1: Fiyat Hesaplama
+### Gözlemler
+✅ En doğru ve denetlenebilir çıktılar; nerede hata yaptığını görmek kolay.  
+❌ En yavaş ve en pahalı (detay açıklamalar token/latency artırıyor).  
+🔎 İlginç: Bütçe probleminde eksi bakiyeyi doğru yakaladı (Zero-Shot çoğu zaman kaçırıyor).
 
+### Kod Çıktı Görselleri
+![CoT adım adım çözüm ekranı 1](assets/cot-trace1.png)  
+![CoT adım adım çözüm ekranı 2](assets/cot-trace2.png)
 
-#### Problem 2: Bütçe Kontrolü (İlginç!)
-
-#### Problem 3: Basit Bölme
-
-
-### Gözlemlerim
-✅ **Avantajlar:**
-- **En doğru sonuçlar** → reasoning sayesinde hataları görüp düzeltiyor
-- **Debugging kolay** → nerede hata yaptığını görebiliyorum
-- **Karmaşık problemlerde en iyi** → çok adımlı işlemler için ideal
-- **Eğitim değeri** → adımları görerek ben de öğreniyorum
-
-❌ **Dezavantajlar:**
-- **En yavaş** → 2.36 saniye (Few-shot: 0.64s)
-- **En pahalı** → 126 token (Few-shot: 13 token)
-- **Bazen gereksiz detaylı** → basit işlemlerde overkill
-
-🔍 **İlginç Bulgu:**
-Problem 2'de Ali'nin parası yetmediğini (-45 TL) doğru tespit etti. Zero-shot muhtemelen bu hatayı yakalayamazdı çünkü step-by-step düşünmüyor.
-
-### Kod Konumu
-`chain_of_thought/math_solver.py`
+### En Zorlandığım Kısımlar
+- Bazı durumlarda gereğinden uzun açıklamalar → maliyet.  
+- Bazen gereksiz varsayım (metinsel problemlerde hallucination’a dikkat).
 
 ---
 
 ## 4. TOOL CALLING
 
 ### Tanım
-LLM'e dış araçlar (API, fonksiyonlar, veritabanları) kullanma yeteneği kazandırma.
+LLM’in dış fonksiyon/servisleri çağırarak gerçek veriye erişmesi.
 
 ### Kullandığım Örnek
-**Program:** Hava Durumu Asistanı (`weather_assistant.py`)
-**Araçlar:** 
-- `get_weather(city)` → anlık hava durumu
-- `get_forecast(city, days)` → tahmin
+**Program:** Hava Durumu Asistanı (`tool_calling/weather_assistant.py`)  
+**Araçlar:** `get_weather(city)`, `get_forecast(city, days)`
 
-### Test Sonuçları
+### Test Sonuçları (özet)
+- **İstanbul/Paris anlık hava** → sıcaklık/nem/rüzgâr bilgisiyle doğal dil çıktısı.  
+- **Bali** → anlık + 3 günlük tahmin çağrıları arka arkaya.  
+- **Adana vs Mersin 5 günlük** → iki ayrı `get_forecast` çağrısı ile net karşılaştırma.  
+- **İzmir vs Antalya anlık** → tek satırda kıyas.
 
-#### Query 1: Basit Sorgu
+### Gözlemler
+✅ Gerçek veriyle cevap → güvenilirlik artıyor.  
+✅ Model hangi tool’u ne zaman çağıracağına akıllıca karar veriyor.  
+❌ JSON şeması/failure case’leri özen istiyor; güvenlik için **write action** yok.
 
-
-#### Query 2: Tahmin İsteği
-
-
-#### Query 3: Çoklu Tool Kullanımı (En İlginç!)
-
-
-### Gözlemlerim
-✅ **Avantajlar:**
-- **LLM'in sınırlarını aşıyor** → Gerçek zamanlı veri kullanabiliyor
-- **Akıllı karar veriyor** → Hangi tool'u ne zaman kullanacağını kendisi seçiyor
-- **Agentic AI'nin temeli** → Blog'da okuduğumuz agent pattern'leri bu şekilde çalışıyor
-- **Ölçeklenebilir** → İstediğim kadar tool ekleyebilirim
-
-❌ **Dezavantajlar:**
-- **Implementation karmaşık** → JSON parsing, error handling gerekli
-- **Hata yönetimi zor** → Tool çağrısı başarısız olursa ne olacak?
-- **Security risk** → Tool'lar yanlış kullanılabilir (blog'daki "write actions" uyarısı!)
-
-🔍 **İlginç Bulgu:**
-Query 3'te "karşılaştır" kelimesini gördüğünde otomatik olarak **iki ayrı tool call** yaptı. Bu çok etkileyici çünkü ben ona "iki tane çağır" demedim!
-
-### Kod Konumu
-`tool_calling/weather_assistant.py`
+### Kod Çıktı Görselleri
+![Tool calling akış diyagramı 1](assets/tool-flow1.png)  
+![Tool calling akış diyagramı 2](assets/tool-flow2.png)
 
 ---
 
 ## 5. KARŞILAŞTIRMA
 
-### Test Edilen Problem
-"Bir bakkalda 3 kg elma 60 TL. 8 kg elma alırsam toplam ne kadar öderim?"
+### Test Problemi
+“Bir bakkalda 3 kg elma 60 TL. 8 kg elma alırsam toplam ne kadar öderim?”
 
-### Sonuçlar (Gerçek Verilerim)
+### Sonuç Tablosu (tek koşu ölçümleri)
 
-| Teknik | Süre | Token | Detay Seviyesi | Başarı |
-|--------|------|-------|----------------|--------|
-| **Zero-Shot** | 1.23s | 45 | Orta (açıklamalı ama kısa) | ✅ 160 TL |
-| **Few-Shot** | 0.64s | 13 | Minimal (sadece formül) | ✅ 160 TL |
-| **Chain-of-Thought** | 2.36s | 126 | Çok Detaylı (4 adım + doğrulama) | ✅ 160 TL |
-
-### Detaylı Analiz
-
-#### Zero-Shot Çıktısı
-
-
-→ **Orta yol:** Hem hızlı hem de açıklayıcı
-
-#### Few-Shot Çıktısı
-
-
-→ **En hızlı!** Örnekleri taklit ederek minimal cevap verdi
-
-#### Chain-of-Thought Çıktısı
+________________________________________________________
+|             SUMMARY TABLE                             |
+________________________________________________________
+|Technique             | Time (s)| Tokens |  Status    |
+|Zero-Shot             | 3.16    |    65  | ✅ Success |
+|Few-Shot              |2.70     |    40  | ✅ Success |
+|Chain-of-Thought      |4.90     |   130  | ✅ Success |
+|Tool-Calling          | 2.66    |    86  | ✅ Success |
+________________________________________________________
 
 
 
-→ **En güvenilir!** Her adımı kontrol etti
+**Analiz**  
+🏆 **En Hızlı:** Tool-Calling (2.66 s) — minimal reasoning + net hesap  
+📚 **En Detaylı:** Chain-of-Thought (130 tokens) — tüm adımlar görünür
 
-### Çıkarımlarım
+**Örnek Çıktılar (kısaltılmış)**
 
-1. **Basit görevler için → Few-Shot**
-   - Hızlı, ucuz, yeterince doğru
-   - Örnek: Basit hesaplar, format dönüşümleri
+- **Zero-Shot:**  
+  “Unit price = 60/3 = 20 TL/kg → 8×20 = **160 TL**.”
+- **Few-Shot:**  
+  “60 ÷ 3 = 20; 20 × 8 = **160 TL**.” *(format kısa, örnekleri taklit etti)*  
+- **CoT:**  
+  “1) Problemi anla… 2) İşlemler… 3) Hesap: 60/3=20, 20×8=**160**… 4) Doğrulama… 5) Sonuç.”  
+- **Tool-Calling (simüle):**  
+  “[CALCULATE: 60/3] → 20; [CALCULATE: 20*8] → **160** TL”
 
-2. **Orta zorlukta görevler için → Zero-Shot**
-   - Çoğu durumda yeterli
-   - Örnek: Çeviriler, özet çıkarma
+**Çıkarımlarım**
+1. **Basit görev → Few-Shot** genelde en iyi denge (hız/ucuz + yeterli doğruluk)  
+2. **Orta zorluk → Zero-Shot** çoğu durumda yeter  
+3. **Kritik/karmaşık → CoT** (denetlenebilirlik ve doğruluk için)  
+4. **Gerçek veri/hesap → Tool-Calling** (API/araçlarla entegrasyon)
 
-3. **Kritik/karmaşık görevler için → Chain-of-Thought**
-   - Hata payı düşük olmalı
-   - Örnek: Finansal hesaplar, tıbbi teşhis desteği, legal analiz
-
-4. **Gerçek dünya verileri gerektiğinde → Tool Calling**
-   - LLM'in bilgisi yetmediğinde
-   - Örnek: Hava durumu, borsa fiyatları, API entegrasyonları
+**Kod**: `comparison/compare_techniques.py`  
+**Görseller**:  
+![Karşılaştırma ekranı 1](assets/compare-tech1.png)  
+![Karşılaştırma ekranı 2](assets/compare-tech2.png)
 
 ---
 
-## ÖĞRENDIKLERİM (Tecrübelerime Dayalı)
+## DOĞRULAMA (Output Verification)
 
-### 1. Temperature Parametresi Çok Önemli!
-```python
-temperature=0.1  # Matematik için → tutarlı, deterministik
-temperature=0.7  # Yaratıcı yazı için → çeşitli, özgün
+- **Deterministik kontrol:** Matematikte beklenen sonuçları Python ile doğruladım (160 TL vb.).  
+- **Model-üstü denetim:** Şüpheli cevapları ikinci bir modelle “audit” ettim.  
+- **Tool sonuç eşleştirme:** Tool-Calling çıktılarıyla model metninin tutarlı olmasını kontrol ettim.  
+- Her testte `✅ PASS / ❌ FAIL` etiketi ve kısa gerekçe ekledim.
 
-reasoning = re.search(r'<reasoning>(.*?)</reasoning>', response)
+---
 
+## ÖĞRENDİKLERİM
 
-Few-Shot:     13 token  → $0.000013 (varsayılan fiyat)
-Zero-Shot:    45 token  → $0.000045
-Chain-of-Thought: 126 token → $0.000126
+- **Temperature önemli:**  
+  - `0.1–0.3` → mantık/matematik için tutarlı  
+  - `0.7+` → yaratıcı yazım/çeşitlilik  
+- **Rate limit & overloaded:**  
+  - 429/`RESOURCE_EXHAUSTED` (özellikle Gemini free tier) → **exponential backoff + fallback**  
+  - Anthropic `overloaded_error` → kısa bekleme + alternatif modele geçiş  
+- **Maliyet bilinci:** CoT en pahalı; Few-Shot genelde en ekonomik denge.  
+- **Güvenlik:** `.env` kesinlikle repoya girmiyor; `.gitignore` ile koruma.
 
-1000 sorgu için:
-- Few-Shot: ~$0.01
-- Zero-Shot: ~$0.05
-- CoT: ~$0.13
+---
 
+## KAYNAK VE ATIFLAR
 
+- **Chip Huyen – Agents yazıları:**  
+  “Agent = Environment + Tools”, “Planning/Task Decomposition”, “ReAct Pattern” — Tool-Calling ve CoT bölümlerinde uygulandı.  
+- **Ders (Erdem Hoca) vurguları:**  
+  Hız-doğruluk-maliyet trade-off’ları, JSON/araç güvenliği, üretim ortamında fallback ve hataya dayanıklılık.
 
+---
 
-## BLOG YAZISI İLE BAĞLANTISI
-Chip Huyen'in blog yazısında öğrendiğim kavramları pratikte denedim:
-Blog'dan → Kodum'a
+## SONRAKİ ADIMLAR (Proje)
 
-## Blog Kavramları ve Pratikte Uygulamaları
+- **Reflexion / Self-Consistency (k>3):** CoT’ta çoklu örnekleme + çoğunluk oylaması  
+- **Gerçek API’ler:** Open-Meteo/Amadeus/Booking vb. ile entegre denemeler  
+- **Otomatik raporlama:** Test → metrik → grafik → `assets/` üretimi
 
-| **Blog Konusu**                | **Pratiğe Yansıması**                                                                                  |
-|-------------------------------|--------------------------------------------------------------------------------------------------------|
-| **Agent = Environment + Tools**| Ortam: Şehir verisi; Araçlar: `get_weather(city)`, `get_forecast(city, days)` fonksiyonları            |
-| **Planning = Task Decomposition** | Matematik problemini 4 adıma bölerek çözmek                                                           |
-| **Tool Calling**               | Hava durumu asistanında tool call formatı ile API fonksiyonlarını çağırmak                             |
-| **Compound Mistakes**          | Chain-of-Thought ile Ali'nin parasının yetmediğini adım adım tespit etmek                              |
-| **ReAct Pattern**              | Weather assistant'ta Reasoning → Action → Observation döngüsünü uygulamak                              |
+---
 
-![Blog kavramları ve uygulama örnekleri](image.png)
+## ÇALIŞTIRMA
 
-
-Daha İleri Gidebilirdim
-Blog'da bahsedilen ama henüz denemediklerim:
-
-Reflexion: Self-critique ile hatalardan öğrenme
-Multi-agent system: Planner + Validator + Executor ayrımı
-Hierarchical planning: High-level → low-level plan decomposition
-
-
-
-ERDEMHoca'nın Beklentisi
-Ne Öğrenmemi İstedi?
-
-✅ LLM'lerin sadece prompt değişimiyle nasıl farklı davrandığını görmek
-✅ Trade-off'ları deneyimlemek (hız vs detay vs maliyet)
-✅ Tool calling ile agent pattern'lerinin temelini anlamak
-✅ Production'da hangi tekniği ne zaman kullanacağımı karar verebilmek
-
-Sonraki Adımlar (Proje İçin)
-
-Bu teknikleri seyahat planlayıcı projesinde birleştirelim
-ReAct pattern ile multi-step planning deneyelim
-Gerçek API'lerle (Amadeus, Booking.com) entegrasyon yapalım
-
-
-Kod Çalıştırma Komutları
-bash# Virtual environment aktif et
-cd Desktop/gsu_llm_odev
-source venv/bin/activate  # Mac/Linux
-# veya
-venv\Scripts\activate     # Windows
+```bash
+# env
+cd Fall2025/MATH690_Graduate_Seminar/W03/Ozge
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt  # (litellm, python-dotenv vs.)
 
 # Zero-Shot
 cd zero_shot && python translator.py

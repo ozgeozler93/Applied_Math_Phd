@@ -34,3 +34,5 @@ venv/
 # Secrets
 .env
 *.env
+
+
