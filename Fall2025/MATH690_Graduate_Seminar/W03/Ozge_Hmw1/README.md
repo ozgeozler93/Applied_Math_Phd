@@ -1,4 +1,4 @@
-# 🧮 Hesap Makinesi (Calculator)
+# 🧮 Hesap Makinesi 
 
 Terminal'den kullanılan basit bir Python hesap makinesi uygulaması.
 
