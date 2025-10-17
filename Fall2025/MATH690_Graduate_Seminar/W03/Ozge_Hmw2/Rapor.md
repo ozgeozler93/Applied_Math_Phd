@@ -38,7 +38,7 @@ cd ../tool_calling && python weather_assistant.py
 
 # Comparison
 cd ../comparison && python compare_techniques.py
-
+```
 ---
 
 ## KULLANDIĞIM MODELLER
