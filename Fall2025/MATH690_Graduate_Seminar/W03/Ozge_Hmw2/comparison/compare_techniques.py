@@ -38,6 +38,22 @@ def test_technique(technique_name, system_prompt, user_prompt, problem):
             "tokens_approx": 0
         }
 
+def test_technique(technique_name, system_prompt, user_prompt, problem):
+    # ...
+    resp = completion(...)
+    
+    # Gerçek token sayısı
+    token_count = resp.get("usage", {}).get("total_tokens", 0)
+    
+    return {
+        "success": True,
+        "answer": answer,
+        "time": elapsed_time,
+        "tokens": token_count,  # ← Gerçek token
+        "words": len(answer.split())  # Kelime sayısı
+    }
+
+
 def compare_all_techniques():
     """Tüm teknikleri karşılaştır"""
     

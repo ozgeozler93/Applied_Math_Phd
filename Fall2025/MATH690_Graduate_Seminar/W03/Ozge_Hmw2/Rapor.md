@@ -19,13 +19,13 @@ Bu ödevde 4 farklı prompting tekniğini (Zero-Shot, Few-Shot, Chain-of-Thought
 > Anahtarlar **lokalde .env** içinde; rapora hiçbir secret eklenmedi.
 
 - **Anthropic**
-  - `claude-3-5-haiku-latest` (birincil; hızlı/ekonomik)
-  - `claude-3-5-sonnet-latest` (fallback; daha güçlü)
+  - `claude-3-5-haiku-20241022` (birincil; hızlı/ekonomik)
+  - `claude-3-5-sonnet-20241022` (fallback; daha güçlü)
 - **Google Gemini**
-  - `gemini-2.0-flash-exp` (bazı denemelerde kullandım; **free-tier** günlük kotasına takılınca fallback’e geçtim)
+  - `gemini/gemini-2.0-flash-exp` (free-tier; günlük kotada 429 hatası)
 - **OpenAI**
   - `gpt-4o-mini` (ek fallback; sınırlı test)
-
+  
 **Neden bu seçim?**  
 Few-Shot/Zero-Shot için küçük ama stabil modeller yeterli. CoT/Reasoning ve Tool-Calling’de daha güçlü/kararlı modeller (sonnet) avantaj sağlıyor. Sağlayıcı yoğunluğu/429 gibi durumlara karşı **model fallback** ve **exponential backoff** ekledim.
 
@@ -52,7 +52,7 @@ Modele örnek vermeden, sadece talimatla görev yaptırma.
 ❌ Karmaşık biçim/ton isteklerinde tutarsız kalabiliyor; “neden böyle yaptı?” takibi zor.
 
 ### Kod Çıktı Görseli
-![Zero-Shot örnek ekran görüntüsü](assets/zero-shot-demo.png)
+![Zero-Shot](./assets/zero-shot-demo.png) 
 
 ### En Zorlandığım Kısımlar
 - Prompt’u kısa tutarken hedef dil/biçimi netleştirmek.
@@ -123,7 +123,7 @@ Birkaç input-output örneğiyle model davranışını örnek üzerinden öğret
 LLM’in dış fonksiyon/servisleri çağırarak gerçek veriye erişmesi.
 
 ### Kullandığım Örnek
-**Program:** Hava Durumu Asistanı (`tool_calling/weather_assistant.py`)  
+**Fonksiyon:** `weather_assistant2()` (iki aşamalı versiyon)
 **Araçlar:** `get_weather(city)`, `get_forecast(city, days)`
 
 ### Test Sonuçları (özet)
@@ -153,7 +153,7 @@ LLM’in dış fonksiyon/servisleri çağırarak gerçek veriye erişmesi.
 ________________________________________________________
 |             SUMMARY TABLE                             |
 ________________________________________________________
-|Technique             | Time (s)| Tokens |  Status    |
+|Technique             | Time (s)| Words |  Status    |
 |Zero-Shot             | 3.16    |    65  | ✅ Success |
 |Few-Shot              |2.70     |    40  | ✅ Success |
 |Chain-of-Thought      |4.90     |   130  | ✅ Success |

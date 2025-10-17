@@ -24,7 +24,7 @@ def solve_math_problem(problem):
 
                     <reasoning>
                     Adım 1: [Problemi anla]
-                    Adim 1.1: [Verilenleri listele]
+                       Adım 1.1: [Verilenleri listele]
                     Adım 2: [Hangi işlem gerekli?]
                     Adım 3: [Hesapla]
                     Adım 4: [Doğrula]
