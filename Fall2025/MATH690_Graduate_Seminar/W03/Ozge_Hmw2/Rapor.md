@@ -14,6 +14,33 @@ Bu ödevde 4 farklı prompting tekniğini (Zero-Shot, Few-Shot, Chain-of-Thought
 
 ---
 
+
+
+## ÇALIŞTIRMA
+
+```bash
+# env
+cd Fall2025/MATH690_Graduate_Seminar/W03/Ozge
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt  # (litellm, python-dotenv vs.)
+
+# Zero-Shot
+cd zero_shot && python translator.py
+
+# Few-Shot
+cd ../few_shot && python sentiment_analyzer.py
+
+# Chain-of-Thought
+cd ../chain_of_thought && python math_solver.py
+
+# Tool Calling
+cd ../tool_calling && python weather_assistant.py
+
+# Comparison
+cd ../comparison && python compare_techniques.py
+
+---
+
 ## KULLANDIĞIM MODELLER
 
 > Anahtarlar **lokalde .env** içinde; rapora hiçbir secret eklenmedi.
@@ -25,7 +52,7 @@ Bu ödevde 4 farklı prompting tekniğini (Zero-Shot, Few-Shot, Chain-of-Thought
   - `gemini/gemini-2.0-flash-exp` (free-tier; günlük kotada 429 hatası)
 - **OpenAI**
   - `gpt-4o-mini` (ek fallback; sınırlı test)
-  
+
 **Neden bu seçim?**  
 Few-Shot/Zero-Shot için küçük ama stabil modeller yeterli. CoT/Reasoning ve Tool-Calling’de daha güçlü/kararlı modeller (sonnet) avantaj sağlıyor. Sağlayıcı yoğunluğu/429 gibi durumlara karşı **model fallback** ve **exponential backoff** ekledim.
 
@@ -228,29 +255,6 @@ ________________________________________________________
 - **Otomatik raporlama:** Test → metrik → grafik → `assets/` üretimi
 
 ---
-
-## ÇALIŞTIRMA
-
-```bash
-# env
-cd Fall2025/MATH690_Graduate_Seminar/W03/Ozge
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt  # (litellm, python-dotenv vs.)
-
-# Zero-Shot
-cd zero_shot && python translator.py
-
-# Few-Shot
-cd ../few_shot && python sentiment_analyzer.py
-
-# Chain-of-Thought
-cd ../chain_of_thought && python math_solver.py
-
-# Tool Calling
-cd ../tool_calling && python weather_assistant.py
-
-# Comparison
-cd ../comparison && python compare_techniques.py
 
 Sonuç
 Bu ödev bana Prompt Engineering'in bir sanat olduğunu gösterdi. Aynı model, aynı görev ama farklı promptlar → tamamen farklı sonuçlar.
