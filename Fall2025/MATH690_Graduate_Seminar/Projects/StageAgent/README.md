@@ -78,7 +78,7 @@ python main.py
 
 **Demo Screenshot:**
 
-![Demo Screenshot](./screenshots/%20Zero-Shot_MVP.png)
+![Demo Screenshot](./screenshots/zero-shot-mvp.png)
 
 **Example Queries:**
 - "I want to see a Shakespearean tragedy" → Recommends Hamlet
