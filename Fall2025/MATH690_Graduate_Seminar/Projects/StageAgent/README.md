@@ -71,10 +71,13 @@ python main.py
 ## ✅ COMPLETED FEATURES
 
 ### STAGE 1: Zero-Shot MVP (Completed)
-- ✅ Mock theater database (6 plays)
+- ✅ Mock theater database (8 plays)
 - ✅ LLM integration (Claude 3.5 Haiku)
 - ✅ Zero-shot recommendations
 - ✅ Basic CLI interface
+- ✅ Basic theater recommendations
+
+
 
 **Demo Screenshot:**
 
@@ -83,3 +86,30 @@ python main.py
 **Example Queries:**
 - "I want to see a Shakespearean tragedy" → Recommends Hamlet
 - "Something funny for tonight" → Recommends Comedy Club Night
+
+
+
+### STAGE 2: Few-Shot Learning + Rating System ✅
+- ✅ User rating system (1-5 stars + review)
+- ✅ SQLite database for preference storage
+- ✅ Few-shot prompting using rating history
+- ✅ Rating statistics (favorites, disliked plays)
+- ✅ Menu-driven interface
+- ✅ Both zero-shot and few-shot available
+
+![Demo Screenshot](./screenshots/few-shot-mvp-1.png)
+![Demo Screenshot](./screenshots/few-shot-mvp-2.png)
+![Demo Screenshot](./screenshots/few-shot-mvp-3.png)
+
+
+**Example Queries:**
+# Menuden:
+- 3 → Hamlet'e 5⭐ ver ("Amazing tragedy!")
+- 3 → Comedy Club Night'a 2⭐ ver ("Not funny")
+- 3 → Macbeth'e 4⭐ ver ("Dark and intense")
+
+# Sonra:
+- 2 → Few-Shot recommendation
+
+# Query: "something dramatic and dark"
+# → AI geçmişinize göre önerecek!
