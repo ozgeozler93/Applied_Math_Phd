@@ -70,5 +70,30 @@
     "time": "20:30",
     "description": "Contemporary Turkish drama about family dynamics",
     "actors": ["Ezgi Mola", "Okan Yalabık"]
+  },
+    {
+    "id": 7,
+    "title": "Aşk Hikayen Düşmüş",
+    "genre": "Romance",
+    "director": "Emrah Eren",
+    "venue": "Tiyatro Hayali",
+    "address": "Kadikoy, Istanbul",
+    "date": "2025-10-25",
+    "time": "20:30",
+    "description": "Aşk hikayeniz bir yerlerde düşmüş olabilir.s",
+    "actors": ["Fatih Koyunoglu", "Ayca Koyunoglu"]
+  },
+    {
+    "id": 8,
+    "title": "Seneye Bugün",
+    "genre": "Romance",
+    "director": "Celal Kadri Kınoğlu",
+    "venue": "Devlet Tiyatrosu",
+    "address": "Kadikoy, Istanbul",
+    "date": "2025-10-22",
+    "time": "20:30",
+    "description": "Aşk hikayeniz bir yerlerde düşmüş olabilir.s",
+    "actors": ["Celal Kadri Kınoğlu", "Gerçek Alnıaçık"]
   }
+
 ]
