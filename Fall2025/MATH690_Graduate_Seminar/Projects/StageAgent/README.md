@@ -45,9 +45,9 @@ python main.py
 
 **Course:** MATH690 - Agentic AI  
 **Instructor:** Dr. Erdem Özcan  
-**Students:** Ayşegül Yavuz & Makbul Özge Özler
+**Students:** Ayşegül Yavuz & Makbul Özge Özler  
 **Institution:** Galatasaray University  
-**Semester:** Fall 2025
+**Semester:** Fall 2025  
 
 ## 📝 Development Stages
 
