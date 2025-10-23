@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "title": "Hamlet",
+    "genre": "Tragedy",
+    "director": "Mehmet Birkiye",
+    "venue": "Şehir Tiyatroları",
+    "address": "Harbiye, Istanbul",
+    "date": "2025-12-15",
+    "time": "20:00",
+    "description": "Shakespeare's timeless tragedy about revenge and madness",
+    "actors": ["Haluk Bilginer", "Hümeyra"]
+  },
+  {
+    "id": 2,
+    "title": "King Lear",
+    "genre": "Tragedy",
+    "director": "Yücel Erten",
+    "venue": "Devlet Tiyatrosu",
+    "address": "Kadıköy, Istanbul",
+    "date": "2025-12-15",
+    "time": "19:30",
+    "description": "An aging king divides his kingdom among his daughters",
+    "actors": ["Levent Üzümcü", "Defne Halman"]
+  },
+  {
+    "id": 3,
+    "title": "Othello",
+    "genre": "Tragedy",
+    "director": "Mehmet Birkiye",
+    "venue": "Şehir Tiyatroları",
+    "address": "Harbiye, Istanbul",
+    "date": "2025-12-20",
+    "time": "20:00",
+    "description": "A tale of jealousy, manipulation, and tragic consequences",
+    "actors": ["Cem Yiğit Üzümoğlu", "Tülin Özen"]
+  },
+  {
+    "id": 4,
+    "title": "Comedy Club Night",
+    "genre": "Comedy",
+    "director": "Ali Poyrazoğlu",
+    "venue": "Zorlu PSM",
+    "address": "Beşiktaş, Istanbul",
+    "date": "2025-12-18",
+    "time": "21:00",
+    "description": "Stand-up comedy night with various performers",
+    "actors": ["Various comedians"]
+  },
+  {
+    "id": 5,
+    "title": "Macbeth",
+    "genre": "Tragedy",
+    "director": "Yücel Erten",
+    "venue": "Devlet Tiyatrosu",
+    "address": "Kadıköy, Istanbul",
+    "date": "2025-12-22",
+    "time": "19:00",
+    "description": "Shakespeare's dark tale of ambition and murder",
+    "actors": ["Bülent Emin Yarar", "Deniz Çakır"]
+  },
+  {
+    "id": 6,
+    "title": "A Modern Drama",
+    "genre": "Drama",
+    "director": "Işıl Kasapoğlu",
+    "venue": "Bakırköy Belediyesi Tiyatrosu",
+    "address": "Bakırköy, Istanbul",
+    "date": "2025-12-25",
+    "time": "20:30",
+    "description": "Contemporary Turkish drama about family dynamics",
+    "actors": ["Ezgi Mola", "Okan Yalabık"]
+  }
+]
