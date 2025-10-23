@@ -66,3 +66,20 @@ python main.py
 ---
 
 **Version:** 0.1.0 (STAGE 1)
+
+---
+## ✅ COMPLETED FEATURES
+
+### STAGE 1: Zero-Shot MVP (Completed)
+- ✅ Mock theater database (6 plays)
+- ✅ LLM integration (Claude 3.5 Haiku)
+- ✅ Zero-shot recommendations
+- ✅ Basic CLI interface
+
+**Demo Screenshot:**
+
+![Demo Screenshot](/StageAgent/screenshots/%20Zero-Shot_MVP.png)
+
+**Example Queries:**
+- "I want to see a Shakespearean tragedy" → Recommends Hamlet
+- "Something funny for tonight" → Recommends Comedy Club Night
