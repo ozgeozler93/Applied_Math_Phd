@@ -1,0 +1,82 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# Screenshots (optional - remove if you want to commit them)
+screenshots/*.png
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Selenium
+chromedriver
+geckodriver
+
+# Project specific
+theater_scraping_results.json
+token.pickle
+credentials.json
+
+# Database files
+data/*.db
+data/*.db-journal
+
+# Credentials
+credentials.json
+token.pickle
+*.pickle
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+
+# Scraping results (large files)
+theater_scraping_results.json
