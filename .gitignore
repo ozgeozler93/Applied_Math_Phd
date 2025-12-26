@@ -80,3 +80,5 @@ venv/
 
 # Scraping results (large files)
 theater_scraping_results.json
+
+

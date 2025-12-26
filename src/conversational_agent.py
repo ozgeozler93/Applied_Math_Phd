@@ -32,6 +32,15 @@ except ImportError:
     CALENDAR_AVAILABLE = False
     print("⚠️  Calendar agent not available. Install Google Calendar API dependencies.")
 
+
+
+try:
+    from web_search_agent import WebSearchAgent 
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    WEB_SEARCH_AVAILABLE = False
+    print("⚠️  Web Search agent not available. Install Tavily dependencies.")   
+
 load_dotenv()
 
 
@@ -138,6 +147,13 @@ def detect_date_from_message(message):
             'display': "Yarın"
         }
     
+    if 'bu hafta' in message_lower:
+        return {
+            'date_str': None,
+            'date_obj': None,
+            'display': "Bu hafta"
+        }
+    
     return None
 
 
@@ -169,6 +185,24 @@ def detect_reference_to_previous(message):
             break
     
     return references
+
+
+def detect_web_search_intent(message):
+    """
+    Detect if user wants web search for current info
+    Returns: True/False
+    """
+    message_lower = message.lower()
+    
+    web_indicators = [
+           'güncel', 'guncel', 'şu an', 'su an', 'bugün', 'bugun',
+           'bu hafta', 'bu ay', 'yeni', 'son', 'web', 'internet',
+            'ara', 'arama', 'bul', 'search', 'gerçek', 'gercek',
+            'canlı', 'canli', 'live', 'şimdi', 'simdi',
+           'haftalık program', 'bu hafta tiyatro', 'gösterim programı'
+    ]
+    
+    return any(indicator in message_lower for indicator in web_indicators)
 
 
 class ConversationMemory:
@@ -262,6 +296,16 @@ class ConversationMemory:
 class TheaterAgent:
     """
     Conversational agent for theater recommendations
+    
+    Agents:
+    - Agent 1: Conversation Manager (this class)
+    - Agent 2: Intent Classifier
+    - Agent 3: Preference Extractor
+    - Agent 4: Data Retrieval (Database+ Location)
+    - Agent 5: Scoring and Ranking
+    - Agent 7: Calendar Integration
+    - Agent 8: Web Search (Tavily) --- NEW!
+
     Features:
     - Natural conversation
     - Context memory (city, date)
@@ -273,19 +317,31 @@ class TheaterAgent:
     def __init__(self):
         self.db = TheaterDatabase()
         self.recommender = ImprovedPlayRecommender()
-        
-        # Conversation memory - NEW!
         self.memory = ConversationMemory()
+
         
         # Agent 7: Calendar Integration
         self.calendar_agent = None
         if CALENDAR_AVAILABLE:
             try:
                 self.calendar_agent = CalendarAgent()
-                print("✅ Calendar Agent initialized!")
+                print(" Calendar Agent initialized!")
             except Exception as e:
-                print(f"⚠️  Calendar Agent not available: {e}")
+                print(f" Calendar Agent not available: {e}")
         
+
+        # Agent 8: Web Search Integration
+        self.web_search_agent = None
+        if WEB_SEARCH_AVAILABLE:
+            try:
+                self.web_search_agent = WebSearchAgent()
+                if self.web_search_agent.is_available():
+                    print(" Web Search Agent initialized!")
+                else:
+                    self.web_search_agent = None
+            except Exception as e:
+                print(f" Web Search Agent not available: {e}")
+
         # Conversation history
         self.messages = []
         
@@ -296,14 +352,16 @@ class TheaterAgent:
         self.user_profile = {
             'preferred_genres': [],
             'disliked_genres': [],
-            'location': 'Beşiktaş, Istanbul',
-            'city': 'Istanbul',
+            'location': [],
+            'city': [],
             'max_distance_km': 15,
             'budget': None
         }
         
         # System prompt
-        self.system_prompt = """You are a helpful theater recommendation assistant for Turkey.
+        self.system_prompt = """You are a helpful theater and film festival recommendation assistant for Turkey. 
+        You can search the web for current theater information and film festival information using Tavily.
+        
 
 Your capabilities:
 - Recommend plays based on user preferences
@@ -361,17 +419,22 @@ Current date: {current_date}
         # Detect intent and decide if we need to call tools
         intent = self._detect_intent(user_message)
         
-        print(f"🧠 Detected intent: {intent}")
-        
-        # Show memory usage if applicable
-        if context['used_memory_for_date']:
-            print(f"📅 Using remembered date: {self.memory.last_date_display}")
-        if context['used_memory_for_city']:
-            print(f"🏙️  Using remembered city: {self.memory.last_city}")
-        
+        print(f" Detected intent: {intent}")
+
+        # Check if user wants web search
+        wants_web_search = detect_web_search_intent(user_message)
+        if wants_web_search:
+            print(f"Web search requested by user.") 
+
+        if context.get('used_memory_for_date'):
+            print(f" Using remembered date: {self.memory.last_date_display}")   
+
+
         # Execute appropriate action based on intent
         if intent == "recommend":
             response = self._handle_recommendation(user_message, context)
+        elif intent == "web_search" or (wants_web_search and intent in ["search", "recommend"]):
+            response = self._handle_web_search(user_message, context)
         elif intent == "info":
             response = self._handle_play_info(user_message)
         elif intent == "search":
@@ -383,6 +446,8 @@ Current date: {current_date}
         else:
             response = self._handle_general_chat(user_message)
         
+
+    
         # Update memory with this turn's context
         self.memory.update(
             city=context['city'],
@@ -404,7 +469,13 @@ Current date: {current_date}
         Detect user intent using LLM
         Returns: recommend, info, search, preference, calendar, general
         """
-        prompt = f"""Classify the user's intent into ONE of these categories:
+
+        message_lower = message.lower()
+
+        if any(word in message_lower for word in ['web', 'internet','guncel ara', 'canli', 'online' ]):
+            return 'web_search'
+        
+        prompt = f"""Classify the user's intent into at least one of these categories:
 - recommend: User wants play recommendations
 - info: User wants information about a specific play
 - search: User wants to search for plays by criteria (date, city, genre)
@@ -414,7 +485,7 @@ Current date: {current_date}
 
 User message: "{message}"
 
-Reply with ONLY one word: recommend, info, search, preference, calendar, or general
+Reply with at least one word: recommend, info, search, preference, calendar, or general
 """
         
         try:
@@ -428,15 +499,63 @@ Reply with ONLY one word: recommend, info, search, preference, calendar, or gene
             
             # Validate intent
             valid_intents = ['recommend', 'info', 'search', 'preference', 'calendar', 'general']
-            if intent not in valid_intents:
-                intent = 'general'
-            
-            return intent
-            
-        except Exception as e:
-            print(f"Intent detection error: {e}")
+            return intent if intent in valid_intents else 'general'            
+        except:
             return 'general'
+        
     
+    def _handle_web_search(self, message, context):
+        """
+        Handle web search requests using Tavily
+        Andrew Ng's Tool Use Pattern in action!
+        """
+        if not self.web_search_agent:
+            return "Üzgünüm, web arama aracı şu anda kullanılamıyor. " \
+                   "Alternatif olarak veritabanindaki oyunları önerebilirim. " \
+                   "Ne tür bir oyun arıyorsunuz?"""
+
+        city = context.get('city', 'Istanbul')
+        date_display = context.get('date_info', {}).get('display') if context.get('date_info') else None
+
+        results = self.web_search_agent.search_theaters(
+            query=message,
+            city=city,
+            date=date_display,
+            max_results=10)
+        
+
+        if not results.get('success'):
+            return f" Web araması başarısız: {results.get('error')}"
+        web_results = results.get('results', [])
+
+        if not web_results:
+            return f""" Web'de **{city}** için sonuç bulunamadı. Farklı bir arama deneyebilirsiniz.
+            Ya da veritabanindaki oyunları önerebilirim. Ne tür bir oyun arıyorsunuz?"""
+
+        response = f" Web'de **{city}** için güncel sonuçlar\n"
+
+        if date_display:
+            response += f"({date_display})"
+        response += f"\n\n"
+
+
+        for i, r in enumerate(web_results[:5], 1): 
+            title = r.get("title", "Başlık yok")
+            content = r.get("content", " ")[:150]
+            url = r.get("url", " ")
+            source = r.get("source", "Web ")
+
+            response += f"**{i}. {title}**\n"
+            response += f"    Kaynak: {source}\n"
+            response += f"    Icerik: {content}...\n"
+            response += f"   [Detaylar]({url})\n\n"
+        
+        response += "---\n"
+        response += "Veritabanindaki oyunlari da önerebilirim. Ne tür bir oyun arıyorsunuz?\n\n"
+
+        return response
+
+
     def _handle_recommendation(self, message, context):
         """
         Handle recommendation requests - NOW WITH CONTEXT!
@@ -445,14 +564,14 @@ Reply with ONLY one word: recommend, info, search, preference, calendar, or gene
         preference_parts = []
         
         # Extract preference from message
-        preference_prompt = f"""Extract the user's preference from their message.
-Focus on: genre, mood, time, or any specific requirements.
+        preference_prompt = f"""Extract the user's theater or festival film preference from their message.
+            Focus on: genre, mood, time, or any specific requirements.
 
-User message: "{message}"
+            User message: "{message}"
 
-Provide a concise preference string (e.g., "light comedy, weekend evening, romantic")
-If no specific preference, return "general entertainment"
-"""
+            Provide a short and concise preference description (example: "dram","comedy", "yerli yapım","Istanbul" ).
+            If no specific preference, return "general entertainment".
+            """
         
         try:
             pref_response = completion(
@@ -461,12 +580,11 @@ If no specific preference, return "general entertainment"
                 temperature=0.3
             )
             
-            preference = pref_response.choices[0].message.content.strip()
-            preference_parts.append(preference)
-            
-        except Exception as e:
+            preference = pref_response.choices[0].message.content.strip()            
+        except :
             preference_parts.append("general entertainment")
-        
+
+
         # Add date context if available
         if context.get('date_info'):
             preference_parts.append(context['date_info']['display'])
@@ -482,16 +600,21 @@ If no specific preference, return "general entertainment"
         city_count = self.db.cursor.fetchone()[0]
         
         if city_count == 0:
-            return f"""Üzgünüm, şu anda **{context['city']}** şehrinde kayıtlı oyun bulunmuyor. 😔
+            # Offer web search as alternative
+            if self.web_search_agent:
+                return f"""Üzgünüm, şu anda **{context['city']}** şehrinde kayıtlı oyun bulunmuyor. 
+                **Web'de arama yapmamı ister misiniz?**
+                "Evet, web'de ara" yazın. 
+                Veritabanımda mevcut şehirler: 
+                Istanbul, 
+                Ankara, 
+                İzmir,
+                Bursa, 
+                Konya"""
+            else:
+                return f""" Uzgünüm, şu anda **{context['city']}** şehrinde kayıtlı oyun bulunmuyor. 
+                Veritabanımda mevcut şehirler: Istanbul, Ankara, İzmir, Bursa, Konya"""
 
-📊 Veritabanımızda mevcut şehirler:
-- Istanbul
-- Ankara
-- İzmir
-- Bursa
-- Konya
-
-Başka bir şehir denemek ister misiniz?"""
         
         # Get recommendations
         recommendations = self.recommender.recommend(
@@ -505,7 +628,8 @@ Başka bir şehir denemek ister misiniz?"""
         
         # Generate natural language response
         if not recommendations:
-            return f"""Üzgünüm, **{context['city']}** şehrinde tercihlerinize uygun bir oyun bulamadım. 😔
+            if self.web_search_agent:
+                return f"""Üzgünüm, veritabanimda uygun bir oyun bulamadım.
 
 Öneriler:
 - Mesafe limitini artırabilir miyiz? (Şu an {self.user_profile['max_distance_km']} km)
@@ -515,7 +639,7 @@ Başka bir şehir denemek ister misiniz?"""
         
         # Format recommendations naturally
         city_display = context['city']
-        date_display = context['date_info']['display'] if context.get('date_info') else None
+        date_display = context.get('date_info', {}).get('display') if context.get('date_info') else None
         
         if date_display:
             response = f"**{city_display}** şehrinde **{date_display}** için {len(recommendations)} öneri buldum! 🎭\n\n"
@@ -533,20 +657,24 @@ Başka bir şehir denemek ister misiniz?"""
             
             if play.get('showtimes'):
                 times = play['showtimes'].split('; ')[:2]
-                response += f"📅 {', '.join(times)}\n"
+                response += f"📅 {', '.join(times)}\\n"
             
-            response += f"💭 {play['reasoning']}\n"
+            response += f"💭 {play['reasoning']}\\n"
             
             if play.get('ticket_url'):
-                response += f"🎫 [Bilet Al]({play['ticket_url']})\n"
+                response += f"🎫 [Bilet Al]({play['ticket_url']})\\n"
             
-            response += "\n"
+            response += "\\n"
         
+        options = []
         # Offer calendar integration
         if self.calendar_agent:
-            response += "📅 Takvime eklemek ister misiniz?"
-        else:
-            response += "Hangi oyun hakkında daha fazla bilgi istersiniz? 🎬"
+            options.append("Takvime ekle")
+        if self.web_search_agent:
+            options.append("Web'de daha fazla ara")
+        
+        if options:
+            response += " | ".join(options)
         
         return response
     
@@ -564,20 +692,20 @@ Başka bir şehir denemek ister misiniz?"""
             play_id, title, venue, genre, showtimes, ticket_url = play
             
             if title.lower() in message_lower or any(word in message_lower for word in title.lower().split()[:3]):
-                info = f"""📖 **{title}** hakkında bilgi:\n\n"""
-                info += f"📍 **Mekan:** {venue}\n"
+                info = f""" **{title}** hakkında bilgi:\n\n"""
+                info += f" **Mekan:** {venue}\n"
                 
                 if showtimes:
                     times = showtimes.split('; ')[:5]
-                    info += f"📅 **Seanslar:** {', '.join(times)}\n"
+                    info += f" **Seanslar:** {', '.join(times)}\n"
                 
                 if ticket_url:
-                    info += f"🎫 **Biletler:** {ticket_url}\n"
+                    info += f" **Biletler:** {ticket_url}\n"
                 
-                info += "\n🎬 YouTube'da fragman aramamı ister misiniz?"
+                info += "\n YouTube'da fragman aramamı ister misiniz?"
                 
                 if self.calendar_agent:
-                    info += "\n📅 Takvime eklemek ister misiniz?"
+                    info += "\n Takvime eklemek ister misiniz?"
                 
                 return info
         
@@ -587,9 +715,9 @@ Başka bir şehir denemek ister misiniz?"""
         """
         Handle when user expresses preferences
         """
-        response = "Tercihlerinizi kaydettim! 📝\n\n"
+        response = "Tercihlerinizi kaydettim! \n\n"
         response += "Şimdi size daha iyi öneriler yapabilirim. "
-        response += "Hangi tür oyun aramak istersiniz? 🎭"
+        response += "Hangi tür oyun aramak istersiniz? "
         
         return response
     
@@ -598,32 +726,44 @@ Başka bir şehir denemek ister misiniz?"""
         Handle calendar-related requests
         """
         if not self.calendar_agent:
-            return """Üzgünüm, takvim entegrasyonu şu anda kullanılamıyor. 📅
+            return """Üzgünüm, takvim entegrasyonu şu anda kullanılamıyor. 
 
-Google Calendar API kurulumu için:
-1. credentials.json dosyası gerekli
-2. Test kullanıcısı olarak eklenmelisiniz
+                Google Calendar API kurulumu için:
+                1. credentials.json dosyası gerekli
+                2. Test kullanıcısı olarak eklenmelisiniz
 
-Yardım: https://console.cloud.google.com/"""
+                Yardım: https://console.cloud.google.com/"""
         
-        # Detect calendar action
-        action = self._detect_calendar_action(message)
+        if not self.last_recommendations:
+            return "Önce bir oyun önerisi almalısınız. Hangi oyunu önereyim? "
         
-        if action == "add_event":
-            return self._add_to_calendar(message)
-        elif action == "check_conflicts":
-            return self._check_calendar_conflicts(message)
-        elif action == "find_free_time":
-            return self._find_free_slots()
+
+        # Use first recommendation as default
+        play = self.last_recommendations[0]
+
+        if play.get('showtimes'):
+            showtime = play['showtimes'].split('; ')
+            parts = showtime.rsplit(' ',1)
+            show_date = parts[0] if len(parts) ==2 else showtime
+            show_time = parts[1] if len(parts) ==2 else "20:00"
         else:
-            return """Takvim ile ilgili ne yapmamı istersiniz? 📅
+            return "Bu oyun icin seans bilgisi yok. Takvime ekleyemem. "
+        
+        result= self.calendar_agent.add_event(
+            play_title=play['title'],
+            venue=play['venue'],
+            show_date=show_date,
+            show_time=show_time,
+            ticket_url=play.get('ticket_url')
+        )
+        if result.get('success'):
+            return f""" **{play['title']}** oyunu takviminize eklendi! 
+                            {play['venue']}
+                            {show_date} - {show_time}
+                            [Calender'da Gör]({result.get('event_link')})"""
+        return f"Hata: Takvime ekleme başarısız oldu: {result.get('error')}"
 
-Yapabileceklerim:
-- 🎭 Önerilen oyunu takvime ekleme
-- ⚠️  Çakışma kontrolü
-- 🔍 Boş zaman bulma
 
-Ne yapmamı istersiniz?"""
     
     def _detect_calendar_action(self, message):
         """
@@ -894,18 +1034,18 @@ def demo():
     print("  🎭 STAGEAGENT - CONVERSATIONAL THEATER ASSISTANT")
     print("  NOW WITH CALENDAR INTEGRATION! 📅")
     print("="*70)
-    print("  Type 'quit' to exit")
+    print("  Type '\\quit' to exit")
     print("="*70 + "\n")
     
     agent = TheaterAgent()
     
     # Sample conversation flow
-    print("🎭 Agent: Merhaba! Ben StageAgent, tiyatro asistanınız! 🎭")
-    print("         Size Türkiye'deki harika oyunları önermek için buradayım.")
-    print("         🏙️  Desteklenen şehirler: İstanbul, Ankara, İzmir, Adana, Bursa...")
+    print("🎭 Agent: Merhaba! Ben StageAgent, tiyatro ve film festivali asistanınız! 🎭")
+    print("         Size Türkiye'deki harika oyunları ve festival filmlerini önermek için buradayım.")
+    print("         🏙️  (Simdilik) Desteklenen şehirler: İstanbul, Ankara, İzmir, Adana, Bursa...")
     if agent.calendar_agent:
         print("         📅 Takvim entegrasyonu aktif - etkinlikleri takviminize ekleyebilirim!")
-    print("         Nasıl bir oyun arıyorsunuz?\n")
+    print("         Nasıl bir oyun ya da festival filmi arıyorsunuz?\n")
     
     while True:
         try:
@@ -932,11 +1072,13 @@ def demo():
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        # Quick test
-        agent = TheaterAgent()
-        agent.chat("25.12.2025 tarihinde İstanbul'da hangi oyunlar var?")
-        agent.chat("Aynı tarih için Adana'da hangi oyunlar var?")
-        agent.close()
-    else:
-        demo()
+    # if len(sys.argv) > 1 and sys.argv[1] == "--test":
+    #     # Quick test
+    #     agent = TheaterAgent()
+    #     agent.chat("25.12.2025 tarihinde İstanbul'da hangi oyunlar var?")
+    #     agent.chat("Aynı tarih için Adana'da hangi oyunlar var?")
+    #     agent.close()
+    # else:
+    #     demo()
+
+    demo()
