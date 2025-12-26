@@ -379,7 +379,7 @@ REASONING: [Türkçe 1-2 cümle açıklama]
             print(f"   ✓ {len(date_filtered)} oyun bu tarihte mevcut")
             
             if not date_filtered:
-                print(f"\n⚠️  {target_date} tarihinde oyun bulunamadı")
+                print(f"\n⚠️  {target_date} tarihinde {self.user_city}'da oyun bulunamadı")
                 print(f"   Tüm yakın oyunlar gösteriliyor...")
             else:
                 nearby_plays = date_filtered

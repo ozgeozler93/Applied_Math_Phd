@@ -280,6 +280,44 @@ class WebSearchAgent:
         
         return formatted
 
+    def search_with_preferences(self, city, date, genre=None, origin=None, max_results=10):
+        """
+        Search with user preferences and filter results
+        
+        Args:
+            city: City name
+            date: Date string
+            genre: Genre preference (dram, komedi, etc.)
+            origin: Origin preference (yerli, yabancı)
+            max_results: Max results
+        
+        Returns:
+            Filtered search results
+        """
+        # Build focused query
+        query_parts = []
+        
+        if genre:
+            query_parts.append(genre)
+        if origin:
+            query_parts.append(origin)
+        
+        query_parts.extend(["tiyatro", city])
+        
+        if date:
+            query_parts.insert(0, date)
+        
+        query = " ".join(query_parts)
+        
+        print(f"🔍 Tercihlerle aranıyor: '{query}'")
+        
+        return self.search_theaters(
+            query=query,
+            city=city,
+            date=date,
+            max_results=max_results
+        )
+
 
 def demo():
     """Demo the web search agent"""

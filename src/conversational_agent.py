@@ -19,7 +19,7 @@ from litellm import completion
 import json
 
 from database import TheaterDatabase
-from recommender import ImprovedPlayRecommender
+from src.recommender import ImprovedPlayRecommender
 
 # Suppress pydantic warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
@@ -206,89 +206,132 @@ def detect_web_search_intent(message):
 
 
 class ConversationMemory:
-    """Tracks conversation context across turns"""
+        """
+        Enhanced Conversation Memory
+        Tracks: city, date, genre, preferences across turns
+        Andrew Ng's "Context Preservation" Pattern
+        """
     
-    def __init__(self):
-        self.last_city = 'Istanbul'
-        self.last_city_location = 'Beşiktaş, Istanbul, Turkey'
-        self.last_date = None
-        self.last_date_display = None
-        self.last_preferences = None
-        self.turn_count = 0
+        GENRES = ['komedi', 'dram', 'müzikal', 'muzikal', 'trajedi', 'stand-up', 
+              'standup', 'çocuk', 'cocuk', 'aile', 'romantik', 'gerilim']
     
-    def update(self, city=None, date_info=None, preferences=None):
-        """Update memory with new context"""
-        self.turn_count += 1
-        
-        if city:
-            self.last_city = city
-            # Update location based on city
+        ORIGIN_KEYWORDS = {
+            'yerli': 'yerli', 'türk': 'yerli', 'turk': 'yerli',
+            'yabancı': 'yabancı', 'yabanci': 'yabancı', 'adaptasyon': 'adaptasyon',
+        }
+        def __init__(self):
+            self.city = 'Istanbul'
+            self.city_location = 'Beşiktaş, Istanbul, Turkey'
+            self.date = None
+            self.date_display = None
+            self.genre = None
+            self.origin = None  # yerli/yabancı
+            self.preferences = []
+            self.turn_count = 0
+
+
+        def extract_genre(self, message):
+            """Extract genre from message"""
+            msg_lower = message.lower()
+            for genre in self.GENRES:
+                if genre in msg_lower:
+                    return genre
+            return None
+
+        def extract_origin(self, message):
+            """Extract origin (yerli/yabancı) from message"""
+            msg_lower = message.lower()
+            for keyword, origin in self.ORIGIN_KEYWORDS.items():
+                if keyword in msg_lower:
+                    return origin
+            return None
+    
+        def update(self, city=None, date_info=None, message=None):    
+            """Update memory with new context"""
+            self.turn_count += 1
+            
+            if city:
+                self.city = city
+                # Update location based on city
+                city_key = city.lower()
+                if city_key in SUPPORTED_CITIES:
+                    self.city_location = SUPPORTED_CITIES[city_key]['location']
+            
+            if date_info and date_info.get('date_obj'): 
+                self.date = date_info.get('date_obj')
+                self.date_display = date_info.get('display')
+            
+            # Extract genre from message
+            if message:
+                genre = self.extract_genre(message)
+                if genre:
+                    self.genre = genre
+                
+                origin = self.extract_origin(message)
+                if origin:
+                    self.origin = origin
+
+
+    
+        def get_context(self, message):
+            """
+            Analyze message and return context, filling in from memory if needed
+            """
+            # Detect new values from message
+            new_city = detect_city_from_message(message)
+            new_date = detect_date_from_message(message)
+            
+            # Check for references to previous context
+            refs = detect_reference_to_previous(message)
+            
+            # Use new values if found, otherwise use memory based on references
+            city = new_city if new_city else self.city
+
+            # Determine final date
+            if new_date:
+                date_info = new_date
+            elif self.date:
+                date_info = {
+                    'date_obj': self.date,
+                    'display': self.date_display
+                }
+            else:
+                date_info = None
+            
+            # Get location for city
             city_key = city.lower()
-            if city_key in SUPPORTED_CITIES:
-                self.last_city_location = SUPPORTED_CITIES[city_key]['location']
-        
-        if date_info:
-            self.last_date = date_info.get('date_obj')
-            self.last_date_display = date_info.get('display')
-        
-        if preferences:
-            self.last_preferences = preferences
-    
-    def get_context(self, message):
-        """
-        Analyze message and return context, filling in from memory if needed
-        """
-        # Detect new values from message
-        new_city = detect_city_from_message(message)
-        new_date = detect_date_from_message(message)
-        
-        # Check for references to previous context
-        refs = detect_reference_to_previous(message)
-        
-        # Determine final city
-        if new_city:
-            city = new_city
-        elif refs['same_city'] and self.last_city:
-            city = self.last_city
-        elif not new_city and self.turn_count > 0:
-            # If no city mentioned and not first turn, keep last city
-            city = self.last_city
-        else:
-            city = 'Istanbul'  # Default
-        
-        # Determine final date
-        if new_date:
-            date_info = new_date
-        elif refs['same_date'] and self.last_date:
-            date_info = {
-                'date_obj': self.last_date,
-                'display': self.last_date_display
+            location = SUPPORTED_CITIES.get(city_key, {}).get('location', self.city_location)
+
+            return {
+                'city': city,
+                'location': location,
+                'date_info': date_info,
+                'used_memory_for_date': refs['same_date'] and not new_date,
+                'used_memory_for_city': refs['same_city'] and not new_city
             }
-        else:
-            date_info = None
-        
-        # Get location for city
-        city_key = city.lower()
-        if city_key in SUPPORTED_CITIES:
-            location = SUPPORTED_CITIES[city_key]['location']
-        else:
-            location = f"{city}, Turkey"
-        
-        return {
-            'city': city,
-            'location': location,
-            'date_info': date_info,
-            'used_memory_for_date': refs['same_date'] and not new_date,
-            'used_memory_for_city': refs['same_city'] and not new_city
-        }
     
-    def get_status(self):
-        """Return current memory status for debugging"""
-        return {
-            'city': self.last_city,
-            'date': self.last_date_display if self.last_date else None,
-            'turns': self.turn_count
-        }
+        def get_preference_string(self):
+                """Return a summary of current preferences"""
+                parts = []
+                if self.genre:
+                    parts.append(f"Tür: {self.genre}")
+                if self.origin:
+                    parts.append(f"Menşei: {self.origin}")
+                if self.date_display:
+                    parts.append(f"Tarih: {self.date_display}")
+                parts.append(f"Şehir: {self.city}")
+                return ", ".join(parts) if parts else "Genel eğlence"
+
+
+        def get_status(self):
+            """Return current memory status for debugging"""
+            return {
+                'city': self.city,
+                'date': self.date_display if self.date else None,
+                'genre': self.genre,
+                'origin': self.origin,
+                'turns': self.turn_count
+            }
 
 
 # ==================== MAIN AGENT CLASS ====================
@@ -433,8 +476,14 @@ Current date: {current_date}
         # Execute appropriate action based on intent
         if intent == "recommend":
             response = self._handle_recommendation(user_message, context)
-        elif intent == "web_search" or (wants_web_search and intent in ["search", "recommend"]):
+        # Continue web search if previous action was web_search and user is refining
+        continue_web = (hasattr(self, 'last_action') and 
+                       self.last_action == 'web_search' and 
+                       intent in ["search", "recommend"])
+        
+        if intent == "web_search" or wants_web_search or continue_web:
             response = self._handle_web_search(user_message, context)
+            self.last_action = 'web_search' 
         elif intent == "info":
             response = self._handle_play_info(user_message)
         elif intent == "search":
@@ -449,7 +498,7 @@ Current date: {current_date}
 
     
         # Update memory with this turn's context
-        self.memory.update(
+        self.memory.update(message=user_message, 
             city=context['city'],
             date_info=context['date_info']
         )
@@ -517,8 +566,16 @@ Reply with at least one word: recommend, info, search, preference, calendar, or 
         city = context.get('city', 'Istanbul')
         date_display = context.get('date_info', {}).get('display') if context.get('date_info') else None
 
+        # Update memory with current message to extract preferences
+        self.memory.update(message=message)
+        
+        # Get preferences from memory
+        genre = getattr(self.memory, 'genre', None)
+        origin = getattr(self.memory, 'origin', None)
+        
+        # Build clean search query - don't repeat the full message
         results = self.web_search_agent.search_theaters(
-            query=message,
+            query="tiyatro oyunları",  # Simple base query
             city=city,
             date=date_display,
             max_results=10)
@@ -532,7 +589,14 @@ Reply with at least one word: recommend, info, search, preference, calendar, or 
             return f""" Web'de **{city}** için sonuç bulunamadı. Farklı bir arama deneyebilirsiniz.
             Ya da veritabanindaki oyunları önerebilirim. Ne tür bir oyun arıyorsunuz?"""
 
-        response = f" Web'de **{city}** için güncel sonuçlar\n"
+        # Show user what preferences we're using
+        pref_info = []
+        if genre:
+            pref_info.append(f"Tür: {genre}")
+        if origin:
+            pref_info.append(f"Yapım: {origin}")
+        
+        response = f"🌐 Web'de **{city}** için güncel sonuçlar\n"
 
         if date_display:
             response += f"({date_display})"
@@ -580,8 +644,9 @@ Reply with at least one word: recommend, info, search, preference, calendar, or 
                 temperature=0.3
             )
             
-            preference = pref_response.choices[0].message.content.strip()            
-        except :
+            preference = pref_response.choices[0].message.content.strip()
+            preference_parts.append(preference)
+        except:
             preference_parts.append("general entertainment")
 
 
@@ -591,6 +656,12 @@ Reply with at least one word: recommend, info, search, preference, calendar, or 
         
         # Add city context
         preference_parts.append(context['city'])
+        
+        # Add genre and origin from memory
+        if self.memory.genre:
+            preference_parts.insert(0, self.memory.genre)
+        if self.memory.origin:
+            preference_parts.insert(1, self.memory.origin)
         
         full_preference = ", ".join(preference_parts)
         print(f"📋 Extracted preference: {full_preference}")
@@ -651,20 +722,20 @@ Reply with at least one word: recommend, info, search, preference, calendar, or 
             
             # Handle None distance
             if play.get('distance_km') is not None:
-                response += f"📍 {play['venue']} ({play['distance_km']} km - ~{play['duration_min']:.0f} dk)\\n"
+                response += f"📍 {play['venue']} ({play['distance_km']} km - ~{play['duration_min']:.0f} dk)\n"
             else:
-                response += f"📍 {play['venue']}\\n"
+                response += f"📍 {play['venue']}\n"
             
             if play.get('showtimes'):
                 times = play['showtimes'].split('; ')[:2]
-                response += f"📅 {', '.join(times)}\\n"
+                response += f"📅 {', '.join(times)}\n"
             
-            response += f"💭 {play['reasoning']}\\n"
+            response += f"💭 {play['reasoning']}\n"
             
             if play.get('ticket_url'):
-                response += f"🎫 [Bilet Al]({play['ticket_url']})\\n"
+                response += f"🎫 [Bilet Al]({play['ticket_url']})\n"
             
-            response += "\\n"
+            response += "\n"
         
         options = []
         # Offer calendar integration
