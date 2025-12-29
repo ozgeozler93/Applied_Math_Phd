@@ -1,0 +1,27 @@
+
+google-generativeai
+
+beautifulsoup4
+webdriver-manager==4.0.1
+
+qrcode[pil]
+Pillow
+
+
+# StageAgent - Theater Recommendation System
+# Python 3.13+
+
+# Core
+python-dotenv==1.0.0
+requests==2.31.0
+
+# LLM
+litellm==1.58.2
+
+# Web Scraping
+selenium==4.27.1
+
+# Google APIs (optional)
+google-auth==2.36.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.154.0

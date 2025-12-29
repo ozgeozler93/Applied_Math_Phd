@@ -1,0 +1,105 @@
+{
+  "total_plays": 5,
+  "scraped_at": "2025-12-29 22:49:40",
+  "source": "biletinial.com",
+  "plays": [
+    {
+      "title": "İki Kişilik Oyun",
+      "url": "https://biletinial.com/tr-tr/tiyatro/acik-iliski",
+      "image": "",
+      "city": "Ankara",
+      "dates": [
+        "03 Ocak Cumartesi 2026, 18:00",
+        "03 Ocak Cumartesi 2026, 20:30",
+        "04 Ocak Pazar 2026, 17:00",
+        "04 Ocak Pazar 2026, 20:30",
+        "05 Ocak Pazartesi 2026, 20:30",
+        "23 Ocak Cuma 2026, 18:00",
+        "23 Ocak Cuma 2026, 20:30",
+        "28 Ocak Çarşamba 2026, 20:30",
+        "04 Şubat Çarşamba 2026, 20:30",
+        "01 Şubat Pazar 2026, 17:00"
+      ],
+      "venues": [
+        "Yenimahalle Nazım Hikmet K M Genco Erkal Sahnesi",
+        "Dasdas Sahne"
+      ],
+      "scraped_at": "2025-12-29 22:48:41"
+    },
+    {
+      "title": "Saatleri Ayarlama Enstitüsü",
+      "url": "https://biletinial.com/tr-tr/tiyatro/saatleri-ayarlama-enstitusu",
+      "image": "",
+      "city": "Istanbul",
+      "dates": [
+        "14 Ocak Çarşamba 2026, 20:30",
+        "04 Ocak Pazar 2026, 20:30",
+        "18 Şubat Çarşamba 2026, 20:30"
+      ],
+      "venues": [
+        "Zorlu PSM Turkcell Sahnesi",
+        "AKM Türk Telekom Opera Salonu"
+      ],
+      "scraped_at": "2025-12-29 22:48:54"
+    },
+    {
+      "title": "Evlilikte Ufak Tefek Cinayetler",
+      "url": "https://biletinial.com/tr-tr/tiyatro/evlilikte-ufak-tefek-cinayetler-aysa",
+      "image": "",
+      "city": "Istanbul",
+      "dates": [
+        "05 Ocak Pazartesi 2026, 20:30",
+        "26 Ocak Pazartesi 2026, 20:30",
+        "06 Ocak Salı 2026, 20:00",
+        "03 Şubat Salı 2026, 20:30"
+      ],
+      "venues": [
+        "Trump Sahne",
+        "Fişekhane Ana Sahne"
+      ],
+      "scraped_at": "2025-12-29 22:49:11"
+    },
+    {
+      "title": "Berfu & Eser Yenenler - Çift Terapisi",
+      "url": "https://biletinial.com/tr-tr/tiyatro/berfu-eser-yenenler-cift-terapisi",
+      "image": "",
+      "city": "Ankara",
+      "dates": [
+        "18 Ocak Pazar 2026, 18:00",
+        "06 Ocak Salı 2026, 20:00",
+        "13 Ocak Salı 2026, 20:00",
+        "31 Ocak Cumartesi 2026, 20:00",
+        "01 Şubat Pazar 2026, 16:00",
+        "08 Mart Pazar 2026, 20:30"
+      ],
+      "venues": [
+        "Samsun Ata Sahne",
+        "Meb Şura Salonu"
+      ],
+      "scraped_at": "2025-12-29 22:49:21"
+    },
+    {
+      "title": "İyi Değilim Ama Anlatacak Kadar Da Kötü Değilim",
+      "url": "https://biletinial.com/tr-tr/tiyatro/iyi-degilim-ama-anlatacak-kadar-da-kotu-degilim",
+      "image": "",
+      "city": "Ankara",
+      "dates": [
+        "07 Ocak Çarşamba 2026, 20:30",
+        "23 Ocak Cuma 2026, 20:30",
+        "20 Ocak Salı 2026, 20:30",
+        "21 Ocak Çarşamba 2026, 20:30",
+        "06 Ocak Salı 2026, 20:30",
+        "07 Şubat Cumartesi 2026, 20:00",
+        "22 Şubat Pazar 2026, 20:30",
+        "18 Şubat Çarşamba 2026, 20:30",
+        "03 Şubat Salı 2026, 20:30"
+      ],
+      "venues": [
+        "Ted Ata Sahne",
+        "DasDas Sahne",
+        "Fişekhane Ana Sahne"
+      ],
+      "scraped_at": "2025-12-29 22:49:30"
+    }
+  ]
+}
