@@ -1926,11 +1926,11 @@ Special thanks to:
 
 ---
 
-## 📧 Contact
+## ⚠️ Known Limitations (Dec 29 checkpoint)
 
-**Makbule Özler**  
-** Aysegul Yavuz**
----
-
+- Event date + city matching relies on listing pages and may produce false positives
+- Venue information may be generic if not verified via detail pages
+- YouTube enrichment is title-based and may include unrelated content
+- Results should be treated as suggestions, not confirmed events
 
 *"Start simple, iterate quickly, and always validate with real data."* - Andrew Ng

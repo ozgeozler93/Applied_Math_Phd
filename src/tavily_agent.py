@@ -3584,589 +3584,1033 @@
 
 # ---------------------- 7-------------------
 
+# # src/tavily_agent.py
+# """
+# TavilySearchAgent v3.0 - MORE RELIABLE Web Search for Theater Information
+
+# Key Improvements:
+# 1. Multiple query strategies (try different queries if first fails)
+# 2. Better date formatting (Turkish dates work better)
+# 3. Fallback to general search if specific date fails
+# 4. Improved relevance filtering for YouTube
+# 5. Better extraction from AI answers
+# """
+
+# import os
+# import re
+# from datetime import datetime, timedelta
+# from dotenv import load_dotenv
+
+# load_dotenv()
+
+# # Try to import tavily
+# try:
+#     from tavily import TavilyClient
+#     TAVILY_AVAILABLE = True
+# except ImportError:
+#     TAVILY_AVAILABLE = False
+#     print("⚠️  Tavily not installed. Run: pip install tavily-python")
+
+
+# class TavilySearchAgent:
+#     """
+#     Web search agent for theater information - v3.0 MORE RELIABLE
+#     """
+    
+#     def __init__(self):
+#         self.api_key = os.getenv("TAVILY_API_KEY")
+#         self.client = None
+        
+#         if not self.api_key:
+#             print("⚠️  TAVILY_API_KEY not found in .env")
+#             return
+        
+#         if TAVILY_AVAILABLE:
+#             try:
+#                 self.client = TavilyClient(api_key=self.api_key)
+#                 print("✅ Tavily Search Agent initialized!")
+#             except Exception as e:
+#                 print(f"⚠️  Tavily initialization failed: {e}")
+#         else:
+#             print("⚠️  Tavily library not available")
+    
+#     def is_available(self):
+#         """Check if Tavily is ready to use"""
+#         return self.client is not None
+    
+#     def search_plays(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
+#         """
+#         Search for theater plays - v3.0 with MULTIPLE QUERY STRATEGIES
+#         """
+#         if not self.client:
+#             return {'success': False, 'error': 'Tavily not available', 'plays': []}
+        
+#         # Turkish month names
+#         turkish_months = {
+#             1: 'Ocak', 2: 'Şubat', 3: 'Mart', 4: 'Nisan',
+#             5: 'Mayıs', 6: 'Haziran', 7: 'Temmuz', 8: 'Ağustos',
+#             9: 'Eylül', 10: 'Ekim', 11: 'Kasım', 12: 'Aralık'
+#         }
+        
+#         # Parse date for query building
+#         target_date = None
+#         date_display = ""
+        
+#         if date_str:
+#             date_lower = date_str.lower()
+#             if date_lower in ['yarın', 'yarin', 'tomorrow']:
+#                 target_date = datetime.now() + timedelta(days=1)
+#             elif date_lower in ['bugün', 'bugun', 'today']:
+#                 target_date = datetime.now()
+#             elif 'hafta sonu' in date_lower:
+#                 today = datetime.now()
+#                 days_until_saturday = (5 - today.weekday()) % 7
+#                 if days_until_saturday == 0 and today.weekday() != 5:
+#                     days_until_saturday = 7
+#                 target_date = today + timedelta(days=days_until_saturday)
+#             elif 'önümüzdeki hafta' in date_lower or 'gelecek hafta' in date_lower:
+#                 target_date = datetime.now() + timedelta(days=7)
+            
+#             if target_date:
+#                 month_tr = turkish_months[target_date.month]
+#                 date_display = f"{target_date.day} {month_tr} {target_date.year}"
+        
+#         # ==================== STRATEGY 1: Specific date query ====================
+#         plays = []
+#         ai_summary = ""
+#         query_used = ""
+        
+#         if date_display:
+#             query1 = f"{city} tiyatro {date_display} hangi oyunlar var"
+#             print(f"🔍 Strategy 1: '{query1}'")
+            
+#             result1 = self._execute_search(query1, max_results + 3)
+#             if result1['success']:
+#                 plays = self._parse_all_results(result1, city)
+#                 ai_summary = result1.get('ai_answer', '')
+#                 query_used = query1
+        
+#         # ==================== STRATEGY 2: Month-based query (if strategy 1 fails) ====================
+#         if len(plays) < 2 and target_date:
+#             month_tr = turkish_months[target_date.month]
+#             query2 = f"{city} tiyatro {month_tr} {target_date.year} oyunlar program"
+#             print(f"🔍 Strategy 2: '{query2}'")
+            
+#             result2 = self._execute_search(query2, max_results + 3)
+#             if result2['success']:
+#                 new_plays = self._parse_all_results(result2, city)
+#                 # Merge results
+#                 existing_titles = {p['title'].lower() for p in plays}
+#                 for p in new_plays:
+#                     if p['title'].lower() not in existing_titles:
+#                         plays.append(p)
+#                 if not ai_summary:
+#                     ai_summary = result2.get('ai_answer', '')
+#                 query_used = query2
+        
+#         # ==================== STRATEGY 3: General city query (fallback) ====================
+#         if len(plays) < 2:
+#             query3 = f"{city} tiyatro bu hafta sahnelenecek oyunlar bilet"
+#             print(f"🔍 Strategy 3 (fallback): '{query3}'")
+            
+#             result3 = self._execute_search(query3, max_results + 5)
+#             if result3['success']:
+#                 new_plays = self._parse_all_results(result3, city)
+#                 existing_titles = {p['title'].lower() for p in plays}
+#                 for p in new_plays:
+#                     if p['title'].lower() not in existing_titles:
+#                         plays.append(p)
+#                 if not ai_summary:
+#                     ai_summary = result3.get('ai_answer', '')
+#                 query_used = query3
+        
+#         # ==================== STRATEGY 4: Site-specific search ====================
+#         if len(plays) < 2:
+#             query4 = f"site:biletinial.com {city} tiyatro oyun"
+#             print(f"🔍 Strategy 4 (site-specific): '{query4}'")
+            
+#             result4 = self._execute_search(query4, max_results + 5, use_domains=False)
+#             if result4['success']:
+#                 new_plays = self._parse_all_results(result4, city)
+#                 existing_titles = {p['title'].lower() for p in plays}
+#                 for p in new_plays:
+#                     if p['title'].lower() not in existing_titles:
+#                         plays.append(p)
+#                 query_used = query4
+        
+#         # ==================== REMOVE DUPLICATES ====================
+#         unique_plays = self._deduplicate_plays(plays)
+        
+#         return {
+#             'success': True,
+#             'plays': unique_plays[:max_results],
+#             'ai_summary': ai_summary,
+#             'source_urls': [],
+#             'query': query_used,
+#             'strategies_tried': 4 if len(plays) < 2 else 1
+#         }
+    
+#     def _execute_search(self, query: str, max_results: int, use_domains: bool = True):
+#         """Execute a single Tavily search"""
+#         try:
+#             search_params = {
+#                 'query': query,
+#                 'search_depth': "advanced",
+#                 'max_results': max_results,
+#                 'include_answer': True,
+#                 'include_raw_content': False
+#             }
+            
+#             if use_domains:
+#                 search_params['include_domains'] = [
+#                     "biletinial.com", 
+#                     "biletix.com", 
+#                     "passo.com.tr", 
+#                     "tiyatrolar.com.tr",
+#                     "mobilet.com"
+#                 ]
+            
+#             response = self.client.search(**search_params)
+            
+#             return {
+#                 'success': True,
+#                 'results': response.get('results', []),
+#                 'ai_answer': response.get('answer', '')
+#             }
+#         except Exception as e:
+#             print(f"   ❌ Search error: {e}")
+#             return {'success': False, 'error': str(e)}
+    
+#     def _parse_all_results(self, search_result, city):
+#         """Parse search results and extract plays"""
+#         plays = []
+#         seen_titles = set()
+        
+#         # Parse from search results
+#         for result in search_result.get('results', []):
+#             play = self._extract_play_from_result(result, city)
+#             if play and play['title'].lower() not in seen_titles:
+#                 if self._is_valid_play_title(play['title']):
+#                     plays.append(play)
+#                     seen_titles.add(play['title'].lower())
+#                     print(f"   ✅ Found: {play['title']}")
+#                 else:
+#                     print(f"   ⏭️ Skipping invalid: {play['title'][:40]}...")
+        
+#         # Parse from AI answer
+#         ai_answer = search_result.get('ai_answer', '')
+#         if ai_answer:
+#             ai_plays = self._extract_plays_from_ai_answer(ai_answer, city)
+#             for p in ai_plays:
+#                 if p['title'].lower() not in seen_titles:
+#                     plays.append(p)
+#                     seen_titles.add(p['title'].lower())
+        
+#         return plays
+    
+#     def _extract_play_from_result(self, result, city):
+#         """Extract play info from a single search result"""
+#         url = result.get('url', '')
+#         title = result.get('title', '')
+#         content = result.get('content', '')
+        
+#         # Skip category pages
+#         if self._is_category_page(title, url):
+#             return None
+        
+#         # Clean title
+#         clean_title = self._clean_title(title)
+        
+#         if not clean_title or len(clean_title) < 3 or len(clean_title) > 80:
+#             return None
+        
+#         # Extract venue
+#         venue = self._extract_venue(content)
+#         if venue:
+#             venue = ' '.join(venue.split())  # Normalize whitespace
+        
+#         # Extract dates
+#         dates = self._extract_dates(content)
+        
+#         return {
+#             'title': clean_title,
+#             'venue': venue or f"{city} Tiyatroları",
+#             'city': city,
+#             'showtimes': '; '.join(dates) if dates else None,
+#             'ticket_url': url,
+#             'source': 'tavily_web'
+#         }
+    
+#     def _is_category_page(self, title, url):
+#         """Check if this is a category/list page"""
+#         title_lower = title.lower()
+        
+#         # Category indicators in title
+#         category_words = [
+#             'tiyatro oyunları', 'biletleri', 'etkinlik takvimi',
+#             'istanbul avrupa', 'istanbul anadolu', 'ankara tiyatro',
+#             'şehir tiyatroları', 'devlet tiyatroları', 'tüm oyunlar',
+#             'etkinlikleri', 'mekan', 'sahne |', 'alan kadıköy',
+#             'akm etkinlik', 'çocuk tiyatrosu', 'sahnedeki', 
+#             'profesyonel tiyatro', 'sahne sanatları'
+#         ]
+        
+#         if any(cat in title_lower for cat in category_words):
+#             return True
+        
+#         # Category URL patterns
+#         category_url_patterns = [
+#             r'/tiyatro/?$',
+#             r'/tiyatro/istanbul',
+#             r'/tiyatro/ankara',
+#             r'/tiyatro/adana',
+#             r'/tiyatro/izmir',
+#             r'/etkinlikleri/',
+#             r'/mekan/',
+#             r'/sahne/',
+#             r'/sehrineozel/',
+#             r'/cocuk-tiyatro',
+#             r'/profesyonel-dt',
+#         ]
+        
+#         for pattern in category_url_patterns:
+#             if re.search(pattern, url):
+#                 return True
+        
+#         return False
+    
+#     def _clean_title(self, title):
+#         """Clean and normalize play title"""
+#         clean = title
+        
+#         # Remove common suffixes
+#         suffixes = [
+#             ' | biletinial', ' | Biletinial', ' - biletinial',
+#             ' | tiyatrolar.com.tr', ' | Biletix',
+#             ' Tiyatro Biletleri', ' Tiyatro Oyunu Biletleri',
+#             ' Biletleri', ' biletleri', ' Bilet',
+#             ' Tiyatro Seans Seçimi', ' Seans Seçimi',
+#             ' Tiyatro Oyunu', '...'
+#         ]
+        
+#         for suffix in suffixes:
+#             if clean.endswith(suffix):
+#                 clean = clean[:-len(suffix)]
+#             clean = clean.replace(suffix, '')
+        
+#         return clean.strip()
+    
+#     def _is_valid_play_title(self, title):
+#         """Check if title is a valid play name"""
+#         if not title or len(title) < 3:
+#             return False
+        
+#         title_lower = title.lower()
+        
+#         # Invalid titles
+#         invalid = [
+#             'tiyatro oyunları', 'biletleri', 'etkinlik', 'takvim',
+#             'istanbul', 'ankara', 'izmir', 'adana', 'türkiye',
+#             'biletinial', 'biletix', 'passo', 'mobilet',
+#             'gelecek program', 'pek yakında', 'coming soon',
+#             'şehir tiyatroları', 'devlet tiyatroları',
+#             'tüm oyunlar', 'sahne', 'mekan', 'salon',
+#             'program', 'liste', 'kategori'
+#         ]
+        
+#         for inv in invalid:
+#             if title_lower == inv:
+#                 return False
+        
+#         # Must have at least one uppercase letter
+#         if not any(c.isupper() for c in title):
+#             return False
+        
+#         return True
+    
+#     def _extract_venue(self, content):
+#         """Extract venue from content"""
+#         if not content:
+#             return None
+        
+#         patterns = [
+#             r'([\w\s]+ Sahnesi)',
+#             r'([\w\s]+ Salonu)',
+#             r'([\w\s]+ Tiyatrosu)',
+#             r'(Zorlu PSM[^,.\n]*)',
+#             r'(DasDas[^,.\n]*)',
+#             r'(Trump Sahne[^,.\n]*)',
+#             r'(AKM[^,.\n]*)',
+#             r'(Harbiye[^,.\n]*)',
+#             r'(KKM[^,.\n]*)',
+#             r'(Moda Sahnesi)',
+#             r'(Alan Kadıköy)',
+#             r'(Jolly Joker[^,.\n]*)',
+#         ]
+        
+#         for pattern in patterns:
+#             match = re.search(pattern, content, re.IGNORECASE)
+#             if match:
+#                 venue = match.group(1).strip()
+#                 if 5 < len(venue) < 60:
+#                     return venue
+        
+#         return None
+    
+#     def _extract_dates(self, content):
+#         """Extract dates from content"""
+#         if not content:
+#             return []
+        
+#         dates = []
+#         months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+#                  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+        
+#         for month in months:
+#             patterns = [
+#                 rf'(\d{{1,2}}\s+{month}\s+\d{{4}})',
+#                 rf'(\d{{1,2}}\s+{month}\s+\w+\s+\d{{2}}:\d{{2}})',
+#             ]
+#             for pattern in patterns:
+#                 matches = re.findall(pattern, content, re.IGNORECASE)
+#                 dates.extend(matches[:2])
+        
+#         # Deduplicate
+#         seen = set()
+#         unique = []
+#         for d in dates:
+#             if d not in seen:
+#                 seen.add(d)
+#                 unique.append(d)
+        
+#         return unique[:3]
+    
+#     def _extract_plays_from_ai_answer(self, ai_answer, city):
+#         """Extract play names from AI summary"""
+#         plays = []
+#         if not ai_answer:
+#             return plays
+        
+#         extracted = set()
+        
+#         # Method 1: Quoted names
+#         quote_patterns = [r'"([^"]+)"', r'"([^"]+)"', r"'([^']+)'"]
+        
+#         for pattern in quote_patterns:
+#             matches = re.findall(pattern, ai_answer)
+#             for match in matches:
+#                 clean = match.strip().strip(',').strip('.')
+#                 # Skip non-play words
+#                 skip = ['istanbul', 'ankara', 'december', 'january', 'february',
+#                        'schedule', 'available', 'tickets', 'check', 'visit']
+#                 if any(s in clean.lower() for s in skip):
+#                     continue
+#                 if 3 < len(clean) < 60:
+#                     extracted.add(clean)
+#                     print(f"   📌 From AI: {clean}")
+        
+#         # Method 2: "X oyunu" pattern
+#         oyun_match = re.findall(r'([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+\w+){0,3})\s+oyunu', ai_answer)
+#         for m in oyun_match:
+#             if 3 < len(m) < 60:
+#                 extracted.add(m.strip())
+        
+#         # Convert to play objects
+#         for name in list(extracted)[:5]:
+#             plays.append({
+#                 'title': name,
+#                 'venue': f"{city} Tiyatroları",
+#                 'city': city,
+#                 'showtimes': None,
+#                 'ticket_url': None,
+#                 'source': 'tavily_ai'
+#             })
+        
+#         # Try to find tickets for extracted plays
+#         for play in plays[:2]:
+#             ticket = self._find_ticket_link(play['title'], city)
+#             if ticket:
+#                 play['ticket_url'] = ticket.get('url')
+#                 if ticket.get('venue'):
+#                     play['venue'] = ticket['venue']
+        
+#         return plays
+    
+#     def _find_ticket_link(self, play_name, city):
+#         """Quick search to find ticket link"""
+#         try:
+#             response = self.client.search(
+#                 query=f'"{play_name}" bilet {city}',
+#                 search_depth="basic",
+#                 max_results=2,
+#                 include_domains=["biletinial.com", "biletix.com", "passo.com.tr"]
+#             )
+            
+#             for r in response.get('results', []):
+#                 url = r.get('url', '')
+#                 if '/tiyatro/' in url and not self._is_category_page('', url):
+#                     return {
+#                         'url': url,
+#                         'venue': self._extract_venue(r.get('content', ''))
+#                     }
+#             return None
+#         except:
+#             return None
+    
+#     def _deduplicate_plays(self, plays):
+#         """Remove duplicate plays"""
+#         unique = []
+#         seen_base = set()
+        
+#         for play in plays:
+#             base = play['title'].lower()
+#             # Remove common suffixes for comparison
+#             for suffix in [' seans seçimi', ' tiyatro', ' bilet', ' oyunu']:
+#                 base = base.replace(suffix, '')
+#             base = base.strip()
+            
+#             if base not in seen_base:
+#                 seen_base.add(base)
+#                 unique.append(play)
+        
+#         return unique
+    
+#     def search_play_interviews(self, play_name: str, max_results: int = 2):
+#         """Search for YouTube videos - STRICT relevance check"""
+#         if not self.client:
+#             return {'success': False, 'videos': []}
+        
+#         # More specific query - exact play name required
+#         query = f'"{play_name}" tiyatro oyunu'
+        
+#         print(f"   🎬 YouTube search: {play_name}")
+        
+#         try:
+#             response = self.client.search(
+#                 query=query,
+#                 search_depth="basic",
+#                 max_results=max_results + 5,  # Get more to filter
+#                 include_domains=["youtube.com", "youtu.be"]
+#             )
+            
+#             videos = []
+            
+#             # Normalize play name for comparison
+#             play_name_lower = play_name.lower()
+#             play_words = [w for w in play_name_lower.split() if len(w) > 2]
+            
+#             for r in response.get('results', []):
+#                 url = r.get('url', '')
+#                 title = r.get('title', '').lower()
+#                 content = r.get('content', '').lower()
+                
+#                 if 'youtube.com' not in url and 'youtu.be' not in url:
+#                     continue
+                
+#                 # STRICT relevance check:
+#                 # At least 2 words from play name must be in title OR
+#                 # The exact play name (or close variant) must be in title/content
+#                 matching_words = sum(1 for w in play_words if w in title or w in content)
+                
+#                 # Check for exact match (with some flexibility)
+#                 exact_match = play_name_lower in title or play_name_lower in content
+                
+#                 # Also check for partial exact match (first 2-3 words)
+#                 partial_match = False
+#                 if len(play_words) >= 2:
+#                     partial = ' '.join(play_words[:2])
+#                     partial_match = partial in title or partial in content
+                
+#                 if not (matching_words >= 2 or exact_match or partial_match):
+#                     print(f"      ⏭️ Skipping (not relevant): {r.get('title', '')[:35]}...")
+#                     continue
+                
+#                 # Additional filter: must have theater-related content
+#                 theater_keywords = ['tiyatro', 'oyun', 'sahne', 'perde', 'oyuncu', 'fragman', 'trailer']
+#                 has_theater = any(kw in title or kw in content for kw in theater_keywords)
+                
+#                 # If no theater keyword, require stronger match
+#                 if not has_theater and matching_words < 3 and not exact_match:
+#                     print(f"      ⏭️ Skipping (no theater context): {r.get('title', '')[:35]}...")
+#                     continue
+                
+#                 videos.append({
+#                     'title': r.get('title', '').replace(' - YouTube', '').strip(),
+#                     'url': url
+#                 })
+                
+#                 if len(videos) >= max_results:
+#                     break
+            
+#             print(f"   🎬 Found {len(videos)} relevant videos")
+#             return {'success': True, 'videos': videos}
+            
+#         except Exception as e:
+#             return {'success': False, 'videos': []}
+    
+#     def search_play_with_videos(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
+#         """Search plays with video enrichment"""
+#         result = self.search_plays(city, date_str, genre, max_results)
+        
+#         if not result['success']:
+#             return result
+        
+#         # Add videos for top 2 plays only
+#         for play in result['plays'][:2]:
+#             video_result = self.search_play_interviews(play['title'], max_results=2)
+#             play['videos'] = video_result.get('videos', [])
+        
+#         for play in result['plays'][2:]:
+#             play['videos'] = []
+        
+#         return result
+    
+#     def search_theater_news(self, city: str = None, max_results: int = 5):
+#         """Get theater news"""
+#         if not self.client:
+#             return {'success': False}
+        
+#         query = f"{city} tiyatro haberleri güncel" if city else "tiyatro haberleri güncel"
+        
+#         try:
+#             response = self.client.search(
+#                 query=query,
+#                 search_depth="basic",
+#                 max_results=max_results,
+#                 include_answer=True
+#             )
+            
+#             news = [{
+#                 'title': r.get('title'),
+#                 'url': r.get('url'),
+#                 'snippet': r.get('content', '')[:200]
+#             } for r in response.get('results', [])]
+            
+#             return {
+#                 'success': True,
+#                 'news': news,
+#                 'summary': response.get('answer', '')
+#             }
+#         except:
+#             return {'success': False}
+    
+#     def enrich_play(self, play_title: str, city: str = None):
+#         """Get more info about a specific play"""
+#         return self._find_ticket_link(play_title, city or 'Istanbul')
+
+
+# # Demo
+# if __name__ == "__main__":
+#     print("\n" + "="*60)
+#     print("  🔍 TAVILY AGENT v3.0 - MULTI-STRATEGY SEARCH")
+#     print("="*60)
+    
+#     agent = TavilySearchAgent()
+    
+#     if agent.is_available():
+#         result = agent.search_plays("Istanbul", "15 Ocak 2026")
+#         print(f"\n✅ Found {len(result['plays'])} plays")
+#         for p in result['plays']:
+#             print(f"   • {p['title']}")
+
+
+# --------------------------- 8----------------------
+
+# # src/tavily_agent.py
+# """
+# TavilySearchAgent v5.0 - SIMPLE & HONEST
+
+# Strateji:
+# 1. Sadece Tavily kullan (scraping yok!)
+# 2. AI özetini ana kaynak olarak göster
+# 3. Oyun listesi ÇIKARMA - sadece özet + kaynak linkler ver
+# 4. DÜRÜST ol: "Bu bilgiler tahminidir, doğrulamak için linklere bakın"
+
+# Bu yaklaşım:
+# ✅ Yanlış oyun-tarih eşleşmesi YOK
+# ✅ İlgisiz video YOK (video özelliği kapalı)
+# ✅ Kullanıcı kaynak sitelerden doğrulayabilir
+# """
+
+# import os
+# from datetime import datetime, timedelta
+# from dotenv import load_dotenv
+
+# load_dotenv()
+
+# try:
+#     from tavily import TavilyClient
+#     TAVILY_AVAILABLE = True
+# except ImportError:
+#     TAVILY_AVAILABLE = False
+
+
+# class TavilySearchAgent:
+#     """
+#     Basit ve dürüst Tavily agent
+#     """
+    
+#     def __init__(self):
+#         self.api_key = os.getenv("TAVILY_API_KEY")
+#         self.client = None
+        
+#         if self.api_key and TAVILY_AVAILABLE:
+#             try:
+#                 self.client = TavilyClient(api_key=self.api_key)
+#                 print("✅ Tavily Search Agent initialized!")
+#             except Exception as e:
+#                 print(f"⚠️  Tavily init failed: {e}")
+    
+#     def is_available(self):
+#         return self.client is not None
+    
+#     def search_plays(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
+#         """
+#         Tiyatro araması - SADECE AI ÖZETİ + KAYNAKLAR
+#         Oyun listesi çıkarmaya ÇALIŞMIYOR (çünkü hatalı oluyor)
+#         """
+#         if not self.client:
+#             return {'success': False, 'error': 'Tavily not available', 'plays': []}
+        
+#         # Build query
+#         query_parts = [city, "tiyatro"]
+        
+#         if date_str:
+#             # Normalize date
+#             query_parts.append(self._normalize_date(date_str))
+#         else:
+#             query_parts.append("bu hafta")
+        
+#         query_parts.append("hangi oyunlar var program")
+        
+#         query = " ".join(query_parts)
+#         print(f"🔍 Tavily searching: '{query}'")
+        
+#         try:
+#             response = self.client.search(
+#                 query=query,
+#                 search_depth="advanced",
+#                 max_results=6,
+#                 include_answer=True,
+#                 include_domains=[
+#                     "biletinial.com",
+#                     "biletix.com",
+#                     "passo.com.tr",
+#                     "sehirtiyatrolari.ibb.istanbul",
+#                     "devtiyatro.gov.tr",
+#                     "tiyatrolar.com.tr"
+#                 ]
+#             )
+            
+#             # Get AI summary (THIS IS THE MAIN OUTPUT)
+#             ai_summary = response.get('answer', '')
+            
+#             # Get source links (for verification)
+#             sources = []
+#             for r in response.get('results', [])[:4]:
+#                 url = r.get('url', '')
+#                 title = r.get('title', '')
+#                 domain = url.split('/')[2].replace('www.', '') if url else ''
+                
+#                 sources.append({
+#                     'title': title[:60],
+#                     'url': url,
+#                     'domain': domain
+#                 })
+            
+#             return {
+#                 'success': True,
+#                 'ai_summary': ai_summary,
+#                 'sources': sources,
+#                 'plays': [],  # Boş bırak - oyun listesi çıkarmıyoruz
+#                 'query': query
+#             }
+            
+#         except Exception as e:
+#             print(f"❌ Tavily error: {e}")
+#             return {'success': False, 'error': str(e), 'plays': []}
+    
+#     def _normalize_date(self, date_str: str) -> str:
+#         """Normalize date to Turkish format"""
+#         months = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+#                  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+        
+#         date_lower = date_str.lower()
+        
+#         if 'yarın' in date_lower or 'yarin' in date_lower:
+#             d = datetime.now() + timedelta(days=1)
+#             return f"{d.day} {months[d.month]} {d.year}"
+#         elif 'bugün' in date_lower or 'bugun' in date_lower:
+#             d = datetime.now()
+#             return f"{d.day} {months[d.month]} {d.year}"
+#         elif 'hafta sonu' in date_lower:
+#             return "bu hafta sonu cumartesi pazar"
+#         elif 'önümüzdeki hafta' in date_lower or 'gelecek hafta' in date_lower:
+#             d = datetime.now() + timedelta(days=7)
+#             return f"{d.day} {months[d.month]} haftası"
+        
+#         return date_str
+    
+#     def search_play_with_videos(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
+#         """
+#         Video aramayı KAPATTIK - çünkü ilgisiz videolar geliyordu
+#         Sadece normal arama yap
+#         """
+#         return self.search_plays(city, date_str, genre, max_results)
+    
+#     def search_theater_news(self, city: str = None, max_results: int = 5):
+#         """Theater news search"""
+#         if not self.client:
+#             return {'success': False}
+        
+#         query = f"{city} tiyatro haberleri güncel" if city else "tiyatro haberleri güncel"
+        
+#         try:
+#             response = self.client.search(
+#                 query=query,
+#                 search_depth="basic",
+#                 max_results=max_results,
+#                 include_answer=True
+#             )
+            
+#             return {
+#                 'success': True,
+#                 'summary': response.get('answer', ''),
+#                 'news': [{'title': r.get('title'), 'url': r.get('url')} 
+#                         for r in response.get('results', [])]
+#             }
+#         except:
+#             return {'success': False}
+
+
+# # Test
+# if __name__ == "__main__":
+#     agent = TavilySearchAgent()
+    
+#     if agent.is_available():
+#         print("\n" + "="*60)
+#         print("TEST: 18 Ocak 2026 Istanbul")
+#         print("="*60)
+        
+#         result = agent.search_plays("Istanbul", "18 Ocak 2026")
+        
+#         if result['success']:
+#             print(f"\n📋 AI Özeti:\n{result['ai_summary']}")
+#             print(f"\n📚 Kaynaklar:")
+#             for s in result['sources']:
+#                 print(f"   • {s['domain']}")
+
+
+
+# ------------------ 9-----------------------------
 # src/tavily_agent.py
 """
-TavilySearchAgent v3.0 - MORE RELIABLE Web Search for Theater Information
+TavilySearchAgent v5.0 - SIMPLE & HONEST
 
-Key Improvements:
-1. Multiple query strategies (try different queries if first fails)
-2. Better date formatting (Turkish dates work better)
-3. Fallback to general search if specific date fails
-4. Improved relevance filtering for YouTube
-5. Better extraction from AI answers
+Strateji:
+1. Sadece Tavily kullan (scraping yok!)
+2. AI özetini ana kaynak olarak göster
+3. Oyun listesi ÇIKARMA - sadece özet + kaynak linkler ver
+4. DÜRÜST ol: "Bu bilgiler tahminidir, doğrulamak için linklere bakın"
+
+Bu yaklaşım:
+✅ Yanlış oyun-tarih eşleşmesi YOK
+✅ İlgisiz video YOK (video özelliği kapalı)
+✅ Kullanıcı kaynak sitelerden doğrulayabilir
 """
 
 import os
-import re
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Try to import tavily
 try:
     from tavily import TavilyClient
     TAVILY_AVAILABLE = True
 except ImportError:
     TAVILY_AVAILABLE = False
-    print("⚠️  Tavily not installed. Run: pip install tavily-python")
 
 
 class TavilySearchAgent:
     """
-    Web search agent for theater information - v3.0 MORE RELIABLE
+    Basit ve dürüst Tavily agent
     """
     
     def __init__(self):
         self.api_key = os.getenv("TAVILY_API_KEY")
         self.client = None
         
-        if not self.api_key:
-            print("⚠️  TAVILY_API_KEY not found in .env")
-            return
-        
-        if TAVILY_AVAILABLE:
+        if self.api_key and TAVILY_AVAILABLE:
             try:
                 self.client = TavilyClient(api_key=self.api_key)
                 print("✅ Tavily Search Agent initialized!")
             except Exception as e:
-                print(f"⚠️  Tavily initialization failed: {e}")
-        else:
-            print("⚠️  Tavily library not available")
+                print(f"⚠️  Tavily init failed: {e}")
     
     def is_available(self):
-        """Check if Tavily is ready to use"""
         return self.client is not None
     
     def search_plays(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
         """
-        Search for theater plays - v3.0 with MULTIPLE QUERY STRATEGIES
+        Tiyatro araması - DAHA SPESİFİK QUERY + DOĞRULAMA
         """
         if not self.client:
             return {'success': False, 'error': 'Tavily not available', 'plays': []}
         
-        # Turkish month names
-        turkish_months = {
-            1: 'Ocak', 2: 'Şubat', 3: 'Mart', 4: 'Nisan',
-            5: 'Mayıs', 6: 'Haziran', 7: 'Temmuz', 8: 'Ağustos',
-            9: 'Eylül', 10: 'Ekim', 11: 'Kasım', 12: 'Aralık'
-        }
+        # Build SPECIFIC query
+        query_parts = []
         
-        # Parse date for query building
-        target_date = None
-        date_display = ""
+        # Add site restriction for better results
+        query_parts.append(f"site:biletinial.com OR site:biletix.com")
+        query_parts.append(city)
+        query_parts.append("tiyatro")
         
         if date_str:
-            date_lower = date_str.lower()
-            if date_lower in ['yarın', 'yarin', 'tomorrow']:
-                target_date = datetime.now() + timedelta(days=1)
-            elif date_lower in ['bugün', 'bugun', 'today']:
-                target_date = datetime.now()
-            elif 'hafta sonu' in date_lower:
-                today = datetime.now()
-                days_until_saturday = (5 - today.weekday()) % 7
-                if days_until_saturday == 0 and today.weekday() != 5:
-                    days_until_saturday = 7
-                target_date = today + timedelta(days=days_until_saturday)
-            elif 'önümüzdeki hafta' in date_lower or 'gelecek hafta' in date_lower:
-                target_date = datetime.now() + timedelta(days=7)
-            
-            if target_date:
-                month_tr = turkish_months[target_date.month]
-                date_display = f"{target_date.day} {month_tr} {target_date.year}"
+            # Normalize date
+            normalized_date = self._normalize_date(date_str)
+            query_parts.append(normalized_date)
         
-        # ==================== STRATEGY 1: Specific date query ====================
-        plays = []
-        ai_summary = ""
-        query_used = ""
+        query_parts.append("oyun seans bilet")
         
-        if date_display:
-            query1 = f"{city} tiyatro {date_display} hangi oyunlar var"
-            print(f"🔍 Strategy 1: '{query1}'")
-            
-            result1 = self._execute_search(query1, max_results + 3)
-            if result1['success']:
-                plays = self._parse_all_results(result1, city)
-                ai_summary = result1.get('ai_answer', '')
-                query_used = query1
-        
-        # ==================== STRATEGY 2: Month-based query (if strategy 1 fails) ====================
-        if len(plays) < 2 and target_date:
-            month_tr = turkish_months[target_date.month]
-            query2 = f"{city} tiyatro {month_tr} {target_date.year} oyunlar program"
-            print(f"🔍 Strategy 2: '{query2}'")
-            
-            result2 = self._execute_search(query2, max_results + 3)
-            if result2['success']:
-                new_plays = self._parse_all_results(result2, city)
-                # Merge results
-                existing_titles = {p['title'].lower() for p in plays}
-                for p in new_plays:
-                    if p['title'].lower() not in existing_titles:
-                        plays.append(p)
-                if not ai_summary:
-                    ai_summary = result2.get('ai_answer', '')
-                query_used = query2
-        
-        # ==================== STRATEGY 3: General city query (fallback) ====================
-        if len(plays) < 2:
-            query3 = f"{city} tiyatro bu hafta sahnelenecek oyunlar bilet"
-            print(f"🔍 Strategy 3 (fallback): '{query3}'")
-            
-            result3 = self._execute_search(query3, max_results + 5)
-            if result3['success']:
-                new_plays = self._parse_all_results(result3, city)
-                existing_titles = {p['title'].lower() for p in plays}
-                for p in new_plays:
-                    if p['title'].lower() not in existing_titles:
-                        plays.append(p)
-                if not ai_summary:
-                    ai_summary = result3.get('ai_answer', '')
-                query_used = query3
-        
-        # ==================== STRATEGY 4: Site-specific search ====================
-        if len(plays) < 2:
-            query4 = f"site:biletinial.com {city} tiyatro oyun"
-            print(f"🔍 Strategy 4 (site-specific): '{query4}'")
-            
-            result4 = self._execute_search(query4, max_results + 5, use_domains=False)
-            if result4['success']:
-                new_plays = self._parse_all_results(result4, city)
-                existing_titles = {p['title'].lower() for p in plays}
-                for p in new_plays:
-                    if p['title'].lower() not in existing_titles:
-                        plays.append(p)
-                query_used = query4
-        
-        # ==================== REMOVE DUPLICATES ====================
-        unique_plays = self._deduplicate_plays(plays)
-        
-        return {
-            'success': True,
-            'plays': unique_plays[:max_results],
-            'ai_summary': ai_summary,
-            'source_urls': [],
-            'query': query_used,
-            'strategies_tried': 4 if len(plays) < 2 else 1
-        }
-    
-    def _execute_search(self, query: str, max_results: int, use_domains: bool = True):
-        """Execute a single Tavily search"""
-        try:
-            search_params = {
-                'query': query,
-                'search_depth': "advanced",
-                'max_results': max_results,
-                'include_answer': True,
-                'include_raw_content': False
-            }
-            
-            if use_domains:
-                search_params['include_domains'] = [
-                    "biletinial.com", 
-                    "biletix.com", 
-                    "passo.com.tr", 
-                    "tiyatrolar.com.tr",
-                    "mobilet.com"
-                ]
-            
-            response = self.client.search(**search_params)
-            
-            return {
-                'success': True,
-                'results': response.get('results', []),
-                'ai_answer': response.get('answer', '')
-            }
-        except Exception as e:
-            print(f"   ❌ Search error: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def _parse_all_results(self, search_result, city):
-        """Parse search results and extract plays"""
-        plays = []
-        seen_titles = set()
-        
-        # Parse from search results
-        for result in search_result.get('results', []):
-            play = self._extract_play_from_result(result, city)
-            if play and play['title'].lower() not in seen_titles:
-                if self._is_valid_play_title(play['title']):
-                    plays.append(play)
-                    seen_titles.add(play['title'].lower())
-                    print(f"   ✅ Found: {play['title']}")
-                else:
-                    print(f"   ⏭️ Skipping invalid: {play['title'][:40]}...")
-        
-        # Parse from AI answer
-        ai_answer = search_result.get('ai_answer', '')
-        if ai_answer:
-            ai_plays = self._extract_plays_from_ai_answer(ai_answer, city)
-            for p in ai_plays:
-                if p['title'].lower() not in seen_titles:
-                    plays.append(p)
-                    seen_titles.add(p['title'].lower())
-        
-        return plays
-    
-    def _extract_play_from_result(self, result, city):
-        """Extract play info from a single search result"""
-        url = result.get('url', '')
-        title = result.get('title', '')
-        content = result.get('content', '')
-        
-        # Skip category pages
-        if self._is_category_page(title, url):
-            return None
-        
-        # Clean title
-        clean_title = self._clean_title(title)
-        
-        if not clean_title or len(clean_title) < 3 or len(clean_title) > 80:
-            return None
-        
-        # Extract venue
-        venue = self._extract_venue(content)
-        if venue:
-            venue = ' '.join(venue.split())  # Normalize whitespace
-        
-        # Extract dates
-        dates = self._extract_dates(content)
-        
-        return {
-            'title': clean_title,
-            'venue': venue or f"{city} Tiyatroları",
-            'city': city,
-            'showtimes': '; '.join(dates) if dates else None,
-            'ticket_url': url,
-            'source': 'tavily_web'
-        }
-    
-    def _is_category_page(self, title, url):
-        """Check if this is a category/list page"""
-        title_lower = title.lower()
-        
-        # Category indicators in title
-        category_words = [
-            'tiyatro oyunları', 'biletleri', 'etkinlik takvimi',
-            'istanbul avrupa', 'istanbul anadolu', 'ankara tiyatro',
-            'şehir tiyatroları', 'devlet tiyatroları', 'tüm oyunlar',
-            'etkinlikleri', 'mekan', 'sahne |', 'alan kadıköy',
-            'akm etkinlik', 'çocuk tiyatrosu', 'sahnedeki', 
-            'profesyonel tiyatro', 'sahne sanatları'
-        ]
-        
-        if any(cat in title_lower for cat in category_words):
-            return True
-        
-        # Category URL patterns
-        category_url_patterns = [
-            r'/tiyatro/?$',
-            r'/tiyatro/istanbul',
-            r'/tiyatro/ankara',
-            r'/tiyatro/adana',
-            r'/tiyatro/izmir',
-            r'/etkinlikleri/',
-            r'/mekan/',
-            r'/sahne/',
-            r'/sehrineozel/',
-            r'/cocuk-tiyatro',
-            r'/profesyonel-dt',
-        ]
-        
-        for pattern in category_url_patterns:
-            if re.search(pattern, url):
-                return True
-        
-        return False
-    
-    def _clean_title(self, title):
-        """Clean and normalize play title"""
-        clean = title
-        
-        # Remove common suffixes
-        suffixes = [
-            ' | biletinial', ' | Biletinial', ' - biletinial',
-            ' | tiyatrolar.com.tr', ' | Biletix',
-            ' Tiyatro Biletleri', ' Tiyatro Oyunu Biletleri',
-            ' Biletleri', ' biletleri', ' Bilet',
-            ' Tiyatro Seans Seçimi', ' Seans Seçimi',
-            ' Tiyatro Oyunu', '...'
-        ]
-        
-        for suffix in suffixes:
-            if clean.endswith(suffix):
-                clean = clean[:-len(suffix)]
-            clean = clean.replace(suffix, '')
-        
-        return clean.strip()
-    
-    def _is_valid_play_title(self, title):
-        """Check if title is a valid play name"""
-        if not title or len(title) < 3:
-            return False
-        
-        title_lower = title.lower()
-        
-        # Invalid titles
-        invalid = [
-            'tiyatro oyunları', 'biletleri', 'etkinlik', 'takvim',
-            'istanbul', 'ankara', 'izmir', 'adana', 'türkiye',
-            'biletinial', 'biletix', 'passo', 'mobilet',
-            'gelecek program', 'pek yakında', 'coming soon',
-            'şehir tiyatroları', 'devlet tiyatroları',
-            'tüm oyunlar', 'sahne', 'mekan', 'salon',
-            'program', 'liste', 'kategori'
-        ]
-        
-        for inv in invalid:
-            if title_lower == inv:
-                return False
-        
-        # Must have at least one uppercase letter
-        if not any(c.isupper() for c in title):
-            return False
-        
-        return True
-    
-    def _extract_venue(self, content):
-        """Extract venue from content"""
-        if not content:
-            return None
-        
-        patterns = [
-            r'([\w\s]+ Sahnesi)',
-            r'([\w\s]+ Salonu)',
-            r'([\w\s]+ Tiyatrosu)',
-            r'(Zorlu PSM[^,.\n]*)',
-            r'(DasDas[^,.\n]*)',
-            r'(Trump Sahne[^,.\n]*)',
-            r'(AKM[^,.\n]*)',
-            r'(Harbiye[^,.\n]*)',
-            r'(KKM[^,.\n]*)',
-            r'(Moda Sahnesi)',
-            r'(Alan Kadıköy)',
-            r'(Jolly Joker[^,.\n]*)',
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, content, re.IGNORECASE)
-            if match:
-                venue = match.group(1).strip()
-                if 5 < len(venue) < 60:
-                    return venue
-        
-        return None
-    
-    def _extract_dates(self, content):
-        """Extract dates from content"""
-        if not content:
-            return []
-        
-        dates = []
-        months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-                 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
-        
-        for month in months:
-            patterns = [
-                rf'(\d{{1,2}}\s+{month}\s+\d{{4}})',
-                rf'(\d{{1,2}}\s+{month}\s+\w+\s+\d{{2}}:\d{{2}})',
-            ]
-            for pattern in patterns:
-                matches = re.findall(pattern, content, re.IGNORECASE)
-                dates.extend(matches[:2])
-        
-        # Deduplicate
-        seen = set()
-        unique = []
-        for d in dates:
-            if d not in seen:
-                seen.add(d)
-                unique.append(d)
-        
-        return unique[:3]
-    
-    def _extract_plays_from_ai_answer(self, ai_answer, city):
-        """Extract play names from AI summary"""
-        plays = []
-        if not ai_answer:
-            return plays
-        
-        extracted = set()
-        
-        # Method 1: Quoted names
-        quote_patterns = [r'"([^"]+)"', r'"([^"]+)"', r"'([^']+)'"]
-        
-        for pattern in quote_patterns:
-            matches = re.findall(pattern, ai_answer)
-            for match in matches:
-                clean = match.strip().strip(',').strip('.')
-                # Skip non-play words
-                skip = ['istanbul', 'ankara', 'december', 'january', 'february',
-                       'schedule', 'available', 'tickets', 'check', 'visit']
-                if any(s in clean.lower() for s in skip):
-                    continue
-                if 3 < len(clean) < 60:
-                    extracted.add(clean)
-                    print(f"   📌 From AI: {clean}")
-        
-        # Method 2: "X oyunu" pattern
-        oyun_match = re.findall(r'([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+\w+){0,3})\s+oyunu', ai_answer)
-        for m in oyun_match:
-            if 3 < len(m) < 60:
-                extracted.add(m.strip())
-        
-        # Convert to play objects
-        for name in list(extracted)[:5]:
-            plays.append({
-                'title': name,
-                'venue': f"{city} Tiyatroları",
-                'city': city,
-                'showtimes': None,
-                'ticket_url': None,
-                'source': 'tavily_ai'
-            })
-        
-        # Try to find tickets for extracted plays
-        for play in plays[:2]:
-            ticket = self._find_ticket_link(play['title'], city)
-            if ticket:
-                play['ticket_url'] = ticket.get('url')
-                if ticket.get('venue'):
-                    play['venue'] = ticket['venue']
-        
-        return plays
-    
-    def _find_ticket_link(self, play_name, city):
-        """Quick search to find ticket link"""
-        try:
-            response = self.client.search(
-                query=f'"{play_name}" bilet {city}',
-                search_depth="basic",
-                max_results=2,
-                include_domains=["biletinial.com", "biletix.com", "passo.com.tr"]
-            )
-            
-            for r in response.get('results', []):
-                url = r.get('url', '')
-                if '/tiyatro/' in url and not self._is_category_page('', url):
-                    return {
-                        'url': url,
-                        'venue': self._extract_venue(r.get('content', ''))
-                    }
-            return None
-        except:
-            return None
-    
-    def _deduplicate_plays(self, plays):
-        """Remove duplicate plays"""
-        unique = []
-        seen_base = set()
-        
-        for play in plays:
-            base = play['title'].lower()
-            # Remove common suffixes for comparison
-            for suffix in [' seans seçimi', ' tiyatro', ' bilet', ' oyunu']:
-                base = base.replace(suffix, '')
-            base = base.strip()
-            
-            if base not in seen_base:
-                seen_base.add(base)
-                unique.append(play)
-        
-        return unique
-    
-    def search_play_interviews(self, play_name: str, max_results: int = 2):
-        """Search for YouTube videos - STRICT relevance check"""
-        if not self.client:
-            return {'success': False, 'videos': []}
-        
-        # More specific query - exact play name required
-        query = f'"{play_name}" tiyatro oyunu'
-        
-        print(f"   🎬 YouTube search: {play_name}")
+        query = " ".join(query_parts)
+        print(f"🔍 Tavily searching: '{query}'")
         
         try:
             response = self.client.search(
                 query=query,
-                search_depth="basic",
-                max_results=max_results + 5,  # Get more to filter
-                include_domains=["youtube.com", "youtu.be"]
+                search_depth="advanced",
+                max_results=8,
+                include_answer=True,
+                include_domains=[
+                    "biletinial.com",
+                    "biletix.com",
+                    "passo.com.tr",
+                    "sehirtiyatrolari.ibb.istanbul",
+                    "devtiyatro.gov.tr",
+                    "tiyatrolar.com.tr"
+                ]
             )
             
-            videos = []
+            # Get AI summary
+            ai_summary = response.get('answer', '')
             
-            # Normalize play name for comparison
-            play_name_lower = play_name.lower()
-            play_words = [w for w in play_name_lower.split() if len(w) > 2]
+            # VALIDATE AI summary - check if it mentions wrong city/date
+            validation = self._validate_summary(ai_summary, city, date_str)
             
-            for r in response.get('results', []):
+            # Get source links (for verification)
+            sources = []
+            for r in response.get('results', [])[:4]:
                 url = r.get('url', '')
-                title = r.get('title', '').lower()
-                content = r.get('content', '').lower()
+                title = r.get('title', '')
+                domain = url.split('/')[2].replace('www.', '') if url else ''
                 
-                if 'youtube.com' not in url and 'youtu.be' not in url:
-                    continue
-                
-                # STRICT relevance check:
-                # At least 2 words from play name must be in title OR
-                # The exact play name (or close variant) must be in title/content
-                matching_words = sum(1 for w in play_words if w in title or w in content)
-                
-                # Check for exact match (with some flexibility)
-                exact_match = play_name_lower in title or play_name_lower in content
-                
-                # Also check for partial exact match (first 2-3 words)
-                partial_match = False
-                if len(play_words) >= 2:
-                    partial = ' '.join(play_words[:2])
-                    partial_match = partial in title or partial in content
-                
-                if not (matching_words >= 2 or exact_match or partial_match):
-                    print(f"      ⏭️ Skipping (not relevant): {r.get('title', '')[:35]}...")
-                    continue
-                
-                # Additional filter: must have theater-related content
-                theater_keywords = ['tiyatro', 'oyun', 'sahne', 'perde', 'oyuncu', 'fragman', 'trailer']
-                has_theater = any(kw in title or kw in content for kw in theater_keywords)
-                
-                # If no theater keyword, require stronger match
-                if not has_theater and matching_words < 3 and not exact_match:
-                    print(f"      ⏭️ Skipping (no theater context): {r.get('title', '')[:35]}...")
-                    continue
-                
-                videos.append({
-                    'title': r.get('title', '').replace(' - YouTube', '').strip(),
-                    'url': url
+                sources.append({
+                    'title': title[:60],
+                    'url': url,
+                    'domain': domain
                 })
-                
-                if len(videos) >= max_results:
-                    break
             
-            print(f"   🎬 Found {len(videos)} relevant videos")
-            return {'success': True, 'videos': videos}
+            return {
+                'success': True,
+                'ai_summary': ai_summary,
+                'sources': sources,
+                'plays': [],
+                'query': query,
+                'validation': validation  # NEW: validation info
+            }
             
         except Exception as e:
-            return {'success': False, 'videos': []}
+            print(f"❌ Tavily error: {e}")
+            return {'success': False, 'error': str(e), 'plays': []}
+    
+    def _validate_summary(self, summary: str, target_city: str, target_date: str) -> dict:
+        """
+        Validate AI summary - check for wrong city/date mentions
+        """
+        validation = {
+            'is_valid': True,
+            'warnings': []
+        }
+        
+        if not summary:
+            return validation
+        
+        summary_lower = summary.lower()
+        target_city_lower = target_city.lower()
+        
+        # List of Turkish cities to check
+        other_cities = ['istanbul', 'ankara', 'izmir', 'adana', 'bursa', 'antalya', 
+                       'samsun', 'mersin', 'konya', 'kayseri', 'eskişehir', 'gaziantep']
+        
+        # Remove target city from list
+        other_cities = [c for c in other_cities if c != target_city_lower]
+        
+        # Check if OTHER cities are mentioned
+        mentioned_wrong_cities = []
+        for city in other_cities:
+            if city in summary_lower:
+                mentioned_wrong_cities.append(city.capitalize())
+        
+        if mentioned_wrong_cities:
+            validation['warnings'].append(
+                f"⚠️ Dikkat: Özette {', '.join(mentioned_wrong_cities)} şehri de geçiyor. "
+                f"Sadece {target_city} için sonuçlara bakın."
+            )
+            validation['is_valid'] = False
+        
+        # Check for date mismatches (simple check)
+        if target_date:
+            # Extract day from target date (e.g., "18" from "18 Ocak 2026")
+            import re
+            day_match = re.search(r'(\d{1,2})', target_date)
+            if day_match:
+                target_day = day_match.group(1)
+                
+                # Look for other dates in summary
+                date_pattern = r'(\d{1,2})\s+(January|February|Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)'
+                found_dates = re.findall(date_pattern, summary, re.IGNORECASE)
+                
+                wrong_dates = [f"{d[0]} {d[1]}" for d in found_dates if d[0] != target_day]
+                
+                if wrong_dates and len(wrong_dates) > len([d for d in found_dates if d[0] == target_day]):
+                    validation['warnings'].append(
+                        f"⚠️ Dikkat: Özette farklı tarihler de geçiyor ({', '.join(wrong_dates[:2])}). "
+                        f"Sadece {target_date} için geçerli olanları kontrol edin."
+                    )
+        
+        return validation
+    
+    def _normalize_date(self, date_str: str) -> str:
+        """Normalize date to Turkish format"""
+        months = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+        
+        date_lower = date_str.lower()
+        
+        if 'yarın' in date_lower or 'yarin' in date_lower:
+            d = datetime.now() + timedelta(days=1)
+            return f"{d.day} {months[d.month]} {d.year}"
+        elif 'bugün' in date_lower or 'bugun' in date_lower:
+            d = datetime.now()
+            return f"{d.day} {months[d.month]} {d.year}"
+        elif 'hafta sonu' in date_lower:
+            return "bu hafta sonu cumartesi pazar"
+        elif 'önümüzdeki hafta' in date_lower or 'gelecek hafta' in date_lower:
+            d = datetime.now() + timedelta(days=7)
+            return f"{d.day} {months[d.month]} haftası"
+        
+        return date_str
     
     def search_play_with_videos(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
-        """Search plays with video enrichment"""
-        result = self.search_plays(city, date_str, genre, max_results)
-        
-        if not result['success']:
-            return result
-        
-        # Add videos for top 2 plays only
-        for play in result['plays'][:2]:
-            video_result = self.search_play_interviews(play['title'], max_results=2)
-            play['videos'] = video_result.get('videos', [])
-        
-        for play in result['plays'][2:]:
-            play['videos'] = []
-        
-        return result
+        """
+        Video aramayı KAPATTIK - çünkü ilgisiz videolar geliyordu
+        Sadece normal arama yap
+        """
+        return self.search_plays(city, date_str, genre, max_results)
     
     def search_theater_news(self, city: str = None, max_results: int = 5):
-        """Get theater news"""
+        """Theater news search"""
         if not self.client:
             return {'success': False}
         
@@ -4180,36 +4624,29 @@ class TavilySearchAgent:
                 include_answer=True
             )
             
-            news = [{
-                'title': r.get('title'),
-                'url': r.get('url'),
-                'snippet': r.get('content', '')[:200]
-            } for r in response.get('results', [])]
-            
             return {
                 'success': True,
-                'news': news,
-                'summary': response.get('answer', '')
+                'summary': response.get('answer', ''),
+                'news': [{'title': r.get('title'), 'url': r.get('url')} 
+                        for r in response.get('results', [])]
             }
         except:
             return {'success': False}
-    
-    def enrich_play(self, play_title: str, city: str = None):
-        """Get more info about a specific play"""
-        return self._find_ticket_link(play_title, city or 'Istanbul')
 
 
-# Demo
+# Test
 if __name__ == "__main__":
-    print("\n" + "="*60)
-    print("  🔍 TAVILY AGENT v3.0 - MULTI-STRATEGY SEARCH")
-    print("="*60)
-    
     agent = TavilySearchAgent()
     
     if agent.is_available():
-        result = agent.search_plays("Istanbul", "15 Ocak 2026")
-        print(f"\n✅ Found {len(result['plays'])} plays")
-        for p in result['plays']:
-            print(f"   • {p['title']}")
-
+        print("\n" + "="*60)
+        print("TEST: 18 Ocak 2026 Istanbul")
+        print("="*60)
+        
+        result = agent.search_plays("Istanbul", "18 Ocak 2026")
+        
+        if result['success']:
+            print(f"\n📋 AI Özeti:\n{result['ai_summary']}")
+            print(f"\n📚 Kaynaklar:")
+            for s in result['sources']:
+                print(f"   • {s['domain']}")
