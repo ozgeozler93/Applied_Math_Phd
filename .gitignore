@@ -1,2 +1,9 @@
 credentials.json
 token.pickle
+
+
+# .gitignore'da olduğundan emin ol
+.venv*
+__pycache__/
+*.db
+data/
