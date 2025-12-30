@@ -4403,6 +4403,258 @@
 
 
 # ------------------ 9-----------------------------
+# # src/tavily_agent.py
+# """
+# TavilySearchAgent v5.0 - SIMPLE & HONEST
+
+# Strateji:
+# 1. Sadece Tavily kullan (scraping yok!)
+# 2. AI özetini ana kaynak olarak göster
+# 3. Oyun listesi ÇIKARMA - sadece özet + kaynak linkler ver
+# 4. DÜRÜST ol: "Bu bilgiler tahminidir, doğrulamak için linklere bakın"
+
+# Bu yaklaşım:
+# ✅ Yanlış oyun-tarih eşleşmesi YOK
+# ✅ İlgisiz video YOK (video özelliği kapalı)
+# ✅ Kullanıcı kaynak sitelerden doğrulayabilir
+# """
+
+# import os
+# from datetime import datetime, timedelta
+# from dotenv import load_dotenv
+
+# load_dotenv()
+
+# try:
+#     from tavily import TavilyClient
+#     TAVILY_AVAILABLE = True
+# except ImportError:
+#     TAVILY_AVAILABLE = False
+
+
+# class TavilySearchAgent:
+#     """
+#     Basit ve dürüst Tavily agent
+#     """
+    
+#     def __init__(self):
+#         self.api_key = os.getenv("TAVILY_API_KEY")
+#         self.client = None
+        
+#         if self.api_key and TAVILY_AVAILABLE:
+#             try:
+#                 self.client = TavilyClient(api_key=self.api_key)
+#                 print("✅ Tavily Search Agent initialized!")
+#             except Exception as e:
+#                 print(f"⚠️  Tavily init failed: {e}")
+    
+#     def is_available(self):
+#         return self.client is not None
+    
+#     def search_plays(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
+#         """
+#         Tiyatro araması - DAHA SPESİFİK QUERY + DOĞRULAMA
+#         """
+#         if not self.client:
+#             return {'success': False, 'error': 'Tavily not available', 'plays': []}
+        
+#         # Build SPECIFIC query
+#         query_parts = []
+        
+#         # Add site restriction for better results
+#         query_parts.append(f"site:biletinial.com OR site:biletix.com")
+#         query_parts.append(city)
+#         query_parts.append("tiyatro")
+        
+#         if date_str:
+#             # Normalize date
+#             normalized_date = self._normalize_date(date_str)
+#             query_parts.append(normalized_date)
+        
+#         query_parts.append("oyun seans bilet")
+        
+#         query = " ".join(query_parts)
+#         print(f"🔍 Tavily searching: '{query}'")
+        
+#         try:
+#             response = self.client.search(
+#                 query=query,
+#                 search_depth="advanced",
+#                 max_results=8,
+#                 include_answer=True,
+#                 include_domains=[
+#                     "biletinial.com",
+#                     "biletix.com",
+#                     "passo.com.tr",
+#                     "sehirtiyatrolari.ibb.istanbul",
+#                     "devtiyatro.gov.tr",
+#                     "tiyatrolar.com.tr"
+#                 ]
+#             )
+            
+#             # Get AI summary
+#             ai_summary = response.get('answer', '')
+            
+#             # VALIDATE AI summary - check if it mentions wrong city/date
+#             validation = self._validate_summary(ai_summary, city, date_str)
+            
+#             # Get source links (for verification)
+#             sources = []
+#             for r in response.get('results', [])[:4]:
+#                 url = r.get('url', '')
+#                 title = r.get('title', '')
+#                 domain = url.split('/')[2].replace('www.', '') if url else ''
+                
+#                 sources.append({
+#                     'title': title[:60],
+#                     'url': url,
+#                     'domain': domain
+#                 })
+            
+#             return {
+#                 'success': True,
+#                 'ai_summary': ai_summary,
+#                 'sources': sources,
+#                 'plays': [],
+#                 'query': query,
+#                 'validation': validation  # NEW: validation info
+#             }
+            
+#         except Exception as e:
+#             print(f"❌ Tavily error: {e}")
+#             return {'success': False, 'error': str(e), 'plays': []}
+    
+#     def _validate_summary(self, summary: str, target_city: str, target_date: str) -> dict:
+#         """
+#         Validate AI summary - check for wrong city/date mentions
+#         """
+#         validation = {
+#             'is_valid': True,
+#             'warnings': []
+#         }
+        
+#         if not summary:
+#             return validation
+        
+#         summary_lower = summary.lower()
+#         target_city_lower = target_city.lower()
+        
+#         # List of Turkish cities to check
+#         other_cities = ['istanbul', 'ankara', 'izmir', 'adana', 'bursa', 'antalya', 
+#                        'samsun', 'mersin', 'konya', 'kayseri', 'eskişehir', 'gaziantep']
+        
+#         # Remove target city from list
+#         other_cities = [c for c in other_cities if c != target_city_lower]
+        
+#         # Check if OTHER cities are mentioned
+#         mentioned_wrong_cities = []
+#         for city in other_cities:
+#             if city in summary_lower:
+#                 mentioned_wrong_cities.append(city.capitalize())
+        
+#         if mentioned_wrong_cities:
+#             validation['warnings'].append(
+#                 f"⚠️ Dikkat: Özette {', '.join(mentioned_wrong_cities)} şehri de geçiyor. "
+#                 f"Sadece {target_city} için sonuçlara bakın."
+#             )
+#             validation['is_valid'] = False
+        
+#         # Check for date mismatches (simple check)
+#         if target_date:
+#             # Extract day from target date (e.g., "18" from "18 Ocak 2026")
+#             import re
+#             day_match = re.search(r'(\d{1,2})', target_date)
+#             if day_match:
+#                 target_day = day_match.group(1)
+                
+#                 # Look for other dates in summary
+#                 date_pattern = r'(\d{1,2})\s+(January|February|Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)'
+#                 found_dates = re.findall(date_pattern, summary, re.IGNORECASE)
+                
+#                 wrong_dates = [f"{d[0]} {d[1]}" for d in found_dates if d[0] != target_day]
+                
+#                 if wrong_dates and len(wrong_dates) > len([d for d in found_dates if d[0] == target_day]):
+#                     validation['warnings'].append(
+#                         f"⚠️ Dikkat: Özette farklı tarihler de geçiyor ({', '.join(wrong_dates[:2])}). "
+#                         f"Sadece {target_date} için geçerli olanları kontrol edin."
+#                     )
+        
+#         return validation
+    
+#     def _normalize_date(self, date_str: str) -> str:
+#         """Normalize date to Turkish format"""
+#         months = ['', 'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+#                  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+        
+#         date_lower = date_str.lower()
+        
+#         if 'yarın' in date_lower or 'yarin' in date_lower:
+#             d = datetime.now() + timedelta(days=1)
+#             return f"{d.day} {months[d.month]} {d.year}"
+#         elif 'bugün' in date_lower or 'bugun' in date_lower:
+#             d = datetime.now()
+#             return f"{d.day} {months[d.month]} {d.year}"
+#         elif 'hafta sonu' in date_lower:
+#             return "bu hafta sonu cumartesi pazar"
+#         elif 'önümüzdeki hafta' in date_lower or 'gelecek hafta' in date_lower:
+#             d = datetime.now() + timedelta(days=7)
+#             return f"{d.day} {months[d.month]} haftası"
+        
+#         return date_str
+    
+#     def search_play_with_videos(self, city: str, date_str: str = None, genre: str = None, max_results: int = 5):
+#         """
+#         Video aramayı KAPATTIK - çünkü ilgisiz videolar geliyordu
+#         Sadece normal arama yap
+#         """
+#         return self.search_plays(city, date_str, genre, max_results)
+    
+#     def search_theater_news(self, city: str = None, max_results: int = 5):
+#         """Theater news search"""
+#         if not self.client:
+#             return {'success': False}
+        
+#         query = f"{city} tiyatro haberleri güncel" if city else "tiyatro haberleri güncel"
+        
+#         try:
+#             response = self.client.search(
+#                 query=query,
+#                 search_depth="basic",
+#                 max_results=max_results,
+#                 include_answer=True
+#             )
+            
+#             return {
+#                 'success': True,
+#                 'summary': response.get('answer', ''),
+#                 'news': [{'title': r.get('title'), 'url': r.get('url')} 
+#                         for r in response.get('results', [])]
+#             }
+#         except:
+#             return {'success': False}
+
+
+# # Test
+# if __name__ == "__main__":
+#     agent = TavilySearchAgent()
+    
+#     if agent.is_available():
+#         print("\n" + "="*60)
+#         print("TEST: 18 Ocak 2026 Istanbul")
+#         print("="*60)
+        
+#         result = agent.search_plays("Istanbul", "18 Ocak 2026")
+        
+#         if result['success']:
+#             print(f"\n📋 AI Özeti:\n{result['ai_summary']}")
+#             print(f"\n📚 Kaynaklar:")
+#             for s in result['sources']:
+#                 print(f"   • {s['domain']}")
+
+
+
+# ----------------------------------------10----------------------------------------
+
 # src/tavily_agent.py
 """
 TavilySearchAgent v5.0 - SIMPLE & HONEST
@@ -4632,6 +4884,84 @@ class TavilySearchAgent:
             }
         except:
             return {'success': False}
+    
+    def enrich_play(self, play_title: str, city: str = None) -> dict:
+        """
+        Tek bir oyun hakkında detaylı bilgi al
+        Takvime ekleme için tarih/saat bilgisi gerekiyor
+        """
+        if not self.client:
+            return {'success': False, 'error': 'Tavily not available'}
+        
+        # Build specific query for this play
+        query_parts = [f'"{play_title}"', 'tiyatro', 'bilet', 'seans', 'tarih']
+        if city:
+            query_parts.insert(1, city)
+        
+        query = " ".join(query_parts)
+        print(f"🔍 Enriching play: '{play_title}'")
+        
+        try:
+            response = self.client.search(
+                query=query,
+                search_depth="advanced",
+                max_results=5,
+                include_answer=True,
+                include_domains=[
+                    "biletinial.com",
+                    "biletix.com",
+                    "passo.com.tr"
+                ]
+            )
+            
+            ai_summary = response.get('answer', '')
+            
+            # Try to find ticket URL
+            ticket_url = None
+            for r in response.get('results', []):
+                url = r.get('url', '')
+                if '/tiyatro/' in url and play_title.lower().replace(' ', '-')[:10] in url.lower():
+                    ticket_url = url
+                    break
+                elif '/tiyatro/' in url:
+                    ticket_url = url  # Fallback to first theater URL
+            
+            # Try to extract date/time from summary
+            import re
+            date_match = re.search(r'(\d{1,2})\s+(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık|January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})', ai_summary, re.IGNORECASE)
+            time_match = re.search(r'(\d{1,2}:\d{2})', ai_summary)
+            
+            showtime = None
+            if date_match:
+                showtime = date_match.group(0)
+                if time_match:
+                    showtime += f" {time_match.group(1)}"
+            
+            # Try to extract venue
+            venue = None
+            venue_patterns = [
+                r'at\s+([A-ZÇĞİÖŞÜa-zçğıöşü\s]+(?:Sahne|Tiyatro|Salon|Merkezi|PSM|AKM))',
+                r'([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*\s+(?:Sahne|Tiyatro|Salon|Merkezi|PSM|AKM))'
+            ]
+            for pattern in venue_patterns:
+                venue_match = re.search(pattern, ai_summary)
+                if venue_match:
+                    venue = venue_match.group(1).strip()
+                    break
+            
+            return {
+                'success': True,
+                'title': play_title,
+                'summary': ai_summary,
+                'ticket_url': ticket_url,
+                'showtime': showtime,
+                'venue': venue or (city if city else 'Bilinmiyor'),
+                'city': city
+            }
+            
+        except Exception as e:
+            print(f"❌ Enrich error: {e}")
+            return {'success': False, 'error': str(e)}
 
 
 # Test
