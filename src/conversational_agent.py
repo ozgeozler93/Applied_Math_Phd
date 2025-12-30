@@ -15836,6 +15836,1645 @@
 
 # -------------------------------13----------------------------------------
 # src/conversational_agent.py   
+# """
+# StageAgent - Conversational Theater Recommendation Agent
+# Natural language interface for finding theater plays
+# NOW WITH CALENDAR + TAVILY WEB SEARCH INTEGRATION!
+
+# v3.0 - Added:
+# - Tavily web search as fallback when database has no results
+# - Web enrichment for play information
+# - Multi-source recommendations (database + web)
+# """
+
+# import os
+# import re
+# import warnings
+# from datetime import datetime, timedelta
+# from dotenv import load_dotenv
+# from litellm import completion
+# import json
+
+# from database import TheaterDatabase
+# from src.recommender import ImprovedPlayRecommender
+
+# # Suppress pydantic warnings
+# warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+
+# # Try to import calendar agent (optional)
+# try:
+#     from calendar_agent import CalendarAgent
+#     CALENDAR_AVAILABLE = True
+# except ImportError:
+#     CALENDAR_AVAILABLE = False
+#     print("⚠️  Calendar agent not available. Install Google Calendar API dependencies.")
+
+# # Try to import Tavily agent (optional)
+# try:
+#     from tavily_agent import TavilySearchAgent
+#     TAVILY_AVAILABLE = True
+# except ImportError:
+#     TAVILY_AVAILABLE = False
+#     print("⚠️  Tavily agent not available. Run: pip install tavily-python")
+
+# # Try to import Hybrid Search Agent (NEW - Scraping + Tavily)
+# try:
+#     from hybrid_search_agent import HybridSearchAgent
+#     HYBRID_AVAILABLE = True
+# except ImportError:
+#     HYBRID_AVAILABLE = False
+#     print("⚠️  Hybrid Search Agent not available")
+
+# load_dotenv()
+
+
+# # ==================== CONVERSATION MEMORY MODULE ====================
+
+# # Supported cities with their default locations
+# SUPPORTED_CITIES = {
+#     'istanbul': {'name': 'Istanbul', 'location': 'Beşiktaş, Istanbul, Turkey'},
+#     'ankara': {'name': 'Ankara', 'location': 'Kızılay, Ankara, Turkey'},
+#     'izmir': {'name': 'İzmir', 'location': 'Konak, İzmir, Turkey'},
+#     'adana': {'name': 'Adana', 'location': 'Seyhan, Adana, Turkey'},
+#     'bursa': {'name': 'Bursa', 'location': 'Osmangazi, Bursa, Turkey'},
+#     'antalya': {'name': 'Antalya', 'location': 'Muratpaşa, Antalya, Turkey'},
+#     'konya': {'name': 'Konya', 'location': 'Selçuklu, Konya, Turkey'},
+#     'sakarya': {'name': 'Sakarya', 'location': 'Adapazarı, Sakarya, Turkey'},
+# }
+
+# # Turkish month names for date parsing
+# TURKISH_MONTHS = {
+#     'ocak': 1, 'şubat': 2, 'mart': 3, 'nisan': 4,
+#     'mayıs': 5, 'haziran': 6, 'temmuz': 7, 'ağustos': 8,
+#     'eylül': 9, 'ekim': 10, 'kasım': 11, 'aralık': 12,
+#     # ASCII versions
+#     'subat': 2, 'mayis': 5, 'agustos': 8, 'eylul': 9, 'aralik': 12
+# }
+
+
+# def detect_city_from_message(message):
+#     """
+#     Detect city from user message
+#     Returns: city_name or None
+#     """
+#     message_lower = message.lower()
+    
+#     # Normalize Turkish characters
+#     normalized = message_lower
+#     replacements = {'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c'}
+#     for tr_char, ascii_char in replacements.items():
+#         normalized = normalized.replace(tr_char, ascii_char)
+    
+#     for city_key, city_info in SUPPORTED_CITIES.items():
+#         if city_key in message_lower or city_key in normalized:
+#             return city_info['name']
+    
+#     # Check Turkish İstanbul with different i variations
+#     if 'i̇stanbul' in message_lower or 'İstanbul' in message:
+#         return 'Istanbul'
+    
+#     return None
+
+
+# def detect_date_from_message(message):
+#     """
+#     Detect date from user message
+#     Returns: dict with 'date_str' and 'date_obj' or None
+#     """
+#     message_lower = message.lower()
+    
+#     # Pattern 1: DD.MM.YYYY
+#     match = re.search(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', message)
+#     if match:
+#         day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+#         try:
+#             date_obj = datetime(year, month, day)
+#             return {
+#                 'date_str': f"{day}.{month}.{year}",
+#                 'date_obj': date_obj,
+#                 'display': date_obj.strftime("%d %B %Y")
+#             }
+#         except ValueError:
+#             pass
+    
+#     # Pattern 2: DD Month YYYY (Turkish)
+#     for month_name, month_num in TURKISH_MONTHS.items():
+#         pattern = rf'(\d{{1,2}})\s+{month_name}\s*(\d{{4}})?'
+#         match = re.search(pattern, message_lower)
+#         if match:
+#             day = int(match.group(1))
+#             year = int(match.group(2)) if match.group(2) else datetime.now().year
+#             try:
+#                 date_obj = datetime(year, month_num, day)
+#                 return {
+#                     'date_str': f"{day}.{month_num}.{year}",
+#                     'date_obj': date_obj,
+#                     'display': f"{day} {month_name.capitalize()} {year}"
+#                 }
+#             except ValueError:
+#                 pass
+    
+#     # Pattern 3: "bugün", "yarın", "bu hafta", "bu hafta sonu"
+#     if 'bugün' in message_lower or 'bugun' in message_lower:
+#         date_obj = datetime.now()
+#         return {
+#             'date_str': date_obj.strftime("%d.%m.%Y"),
+#             'date_obj': date_obj,
+#             'display': "Bugün"
+#         }
+    
+#     if 'yarın' in message_lower or 'yarin' in message_lower:
+#         date_obj = datetime.now() + timedelta(days=1)
+#         return {
+#             'date_str': date_obj.strftime("%d.%m.%Y"),
+#             'date_obj': date_obj,
+#             'display': "Yarın"
+#         }
+    
+#     if 'bu hafta sonu' in message_lower or 'hafta sonu' in message_lower:
+#         today = datetime.now()
+#         # Find next Saturday
+#         days_until_saturday = (5 - today.weekday()) % 7
+#         if days_until_saturday == 0 and today.weekday() != 5:
+#             days_until_saturday = 7
+#         saturday = today + timedelta(days=days_until_saturday)
+#         return {
+#             'date_str': saturday.strftime("%d.%m.%Y"),
+#             'date_obj': saturday,
+#             'display': "Bu Hafta Sonu"
+#         }
+    
+#     # Pattern: "önümüzdeki hafta" or "gelecek hafta" or "haftaya"
+#     if 'önümüzdeki hafta' in message_lower or 'gelecek hafta' in message_lower or 'haftaya' in message_lower:
+#         today = datetime.now()
+#         # Next week starts next Monday
+#         days_until_monday = (7 - today.weekday()) % 7
+#         if days_until_monday == 0:
+#             days_until_monday = 7
+#         next_monday = today + timedelta(days=days_until_monday)
+#         return {
+#             'date_str': next_monday.strftime("%d.%m.%Y"),
+#             'date_obj': next_monday,
+#             'display': "Önümüzdeki Hafta"
+#         }
+    
+#     if 'bu hafta' in message_lower:
+#         return {
+#             'date_str': None,
+#             'date_obj': None,
+#             'display': "Bu Hafta"
+#         }
+    
+#     return None
+
+
+# def detect_reference_to_previous(message):
+#     """
+#     Detect if user is referring to previous context
+#     Returns: dict with what they're referring to
+#     """
+#     message_lower = message.lower()
+    
+#     references = {
+#         'same_date': False,
+#         'same_city': False,
+#     }
+    
+#     # Date references
+#     date_refs = ['aynı tarih', 'ayni tarih', 'o tarih', 'bu tarih', 
+#                  'aynı gün', 'ayni gun', 'o gün', 'o gun']
+#     for ref in date_refs:
+#         if ref in message_lower:
+#             references['same_date'] = True
+#             break
+    
+#     # City references  
+#     city_refs = ['aynı şehir', 'ayni sehir', 'orada', 'aynı yer', 'ayni yer']
+#     for ref in city_refs:
+#         if ref in message_lower:
+#             references['same_city'] = True
+#             break
+    
+#     return references
+
+
+# class ConversationMemory:
+#     """Tracks conversation context across turns"""
+    
+#     def __init__(self):
+#         self.last_city = 'Istanbul'
+#         self.last_city_location = 'Beşiktaş, Istanbul, Turkey'
+#         self.last_date = None
+#         self.last_date_display = None
+#         self.last_preferences = None
+#         self.turn_count = 0
+    
+#     def update(self, city=None, date_info=None, preferences=None):
+#         """Update memory with new context"""
+#         self.turn_count += 1
+        
+#         if city:
+#             self.last_city = city
+#             # Update location based on city
+#             city_key = city.lower()
+#             if city_key in SUPPORTED_CITIES:
+#                 self.last_city_location = SUPPORTED_CITIES[city_key]['location']
+        
+#         if date_info:
+#             self.last_date = date_info.get('date_obj')
+#             self.last_date_display = date_info.get('display')
+        
+#         if preferences:
+#             self.last_preferences = preferences
+    
+#     def get_context(self, message):
+#         """
+#         Analyze message and return context, filling in from memory if needed
+#         """
+#         # Detect new values from message
+#         new_city = detect_city_from_message(message)
+#         new_date = detect_date_from_message(message)
+        
+#         # Check for references to previous context
+#         refs = detect_reference_to_previous(message)
+        
+#         # Determine final city
+#         if new_city:
+#             city = new_city
+#         elif refs['same_city'] and self.last_city:
+#             city = self.last_city
+#         elif not new_city and self.turn_count > 0:
+#             # If no city mentioned and not first turn, keep last city
+#             city = self.last_city
+#         else:
+#             city = 'Istanbul'  # Default
+        
+#         # Determine final date
+#         if new_date:
+#             date_info = new_date
+#         elif refs['same_date'] and self.last_date:
+#             date_info = {
+#                 'date_obj': self.last_date,
+#                 'display': self.last_date_display
+#             }
+#         else:
+#             date_info = None
+        
+#         # Get location for city
+#         city_key = city.lower()
+#         if city_key in SUPPORTED_CITIES:
+#             location = SUPPORTED_CITIES[city_key]['location']
+#         else:
+#             location = f"{city}, Turkey"
+        
+#         return {
+#             'city': city,
+#             'location': location,
+#             'date_info': date_info,
+#             'used_memory_for_date': refs['same_date'] and not new_date,
+#             'used_memory_for_city': refs['same_city'] and not new_city
+#         }
+    
+#     def get_status(self):
+#         """Return current memory status for debugging"""
+#         return {
+#             'city': self.last_city,
+#             'date': self.last_date_display if self.last_date else None,
+#             'turns': self.turn_count
+#         }
+
+
+# # ==================== MAIN AGENT CLASS ====================
+
+# class TheaterAgent:
+#     """
+#     Conversational agent for theater recommendations
+#     Features:
+#     - Natural conversation
+#     - Context memory (city, date)
+#     - Multi-city support
+#     - Tool calling (database, maps, youtube, calendar, tavily)
+#     - Web search fallback when database has no results
+#     - Personalization
+#     """
+    
+#     def __init__(self):
+#         self.db = TheaterDatabase()
+#         self.recommender = ImprovedPlayRecommender()
+        
+#         # Conversation memory
+#         self.memory = ConversationMemory()
+        
+#         # Agent 7: Calendar Integration
+#         self.calendar_agent = None
+#         if CALENDAR_AVAILABLE:
+#             try:
+#                 self.calendar_agent = CalendarAgent()
+#                 print("✅ Calendar Agent initialized!")
+#             except Exception as e:
+#                 print(f"⚠️  Calendar Agent not available: {e}")
+        
+#         # Agent 8: Tavily Web Search
+#         self.tavily_agent = None
+#         if TAVILY_AVAILABLE:
+#             try:
+#                 self.tavily_agent = TavilySearchAgent()
+#                 if self.tavily_agent.is_available():
+#                     print("✅ Tavily Search Agent initialized!")
+#                 else:
+#                     self.tavily_agent = None
+#             except Exception as e:
+#                 print(f"⚠️  Tavily Agent not available: {e}")
+        
+#         # Agent 9: Hybrid Search (NEW - Scraping + Tavily)
+#         self.hybrid_agent = None
+#         if HYBRID_AVAILABLE:
+#             try:
+#                 self.hybrid_agent = HybridSearchAgent()
+#                 if self.hybrid_agent.is_available():
+#                     print("✅ Hybrid Search Agent initialized (Scraping + Tavily)!")
+#                 else:
+#                     self.hybrid_agent = None
+#             except Exception as e:
+#                 print(f"⚠️  Hybrid Agent not available: {e}")
+        
+#         # Conversation history
+#         self.messages = []
+        
+#         # Last recommendations (for calendar integration)
+#         self.last_recommendations = []
+        
+#         # User preferences (learned over time)
+#         self.user_profile = {
+#             'preferred_genres': [],
+#             'disliked_genres': [],
+#             'location': 'Beşiktaş, Istanbul',
+#             'city': 'Istanbul',
+#             'max_distance_km': 15,
+#             'budget': None
+#         }
+        
+#         # System prompt
+#         self.system_prompt = """You are a helpful theater recommendation assistant for Turkey.
+
+# Your capabilities:
+# - Recommend plays based on user preferences
+# - Support multiple cities (Istanbul, Ankara, Adana, İzmir, Bursa, etc.)
+# - Provide information about specific plays
+# - Help users find showtimes and venues
+# - Add events to user's Google Calendar
+# - Check for scheduling conflicts
+# - Find free time slots
+# - Search the web for current theater information
+# - Learn user preferences over time
+
+# You have access to:
+# - Database of theater plays in Turkish cities
+# - Google Maps for distance calculation
+# - YouTube for trailers/reviews
+# - Google Calendar for scheduling
+# - Tavily Web Search for current information
+
+# Guidelines:
+# - Be friendly, enthusiastic, and knowledgeable about theater
+# - Ask clarifying questions when needed
+# - Provide specific recommendations with reasons
+# - Remember user preferences from the conversation
+# - Remember the city and date from previous messages
+# - Use emojis occasionally to be warm and engaging
+# - Proactively offer to add events to calendar
+# - When database has no results, search the web automatically
+
+# Current date: {current_date}
+# """.format(current_date=datetime.now().strftime('%Y-%m-%d'))
+    
+#     def chat(self, user_message):
+#         """
+#         Main chat function - processes user message and generates response
+#         """
+#         print(f"\n{'='*70}")
+#         print(f"You: {user_message}")
+#         print(f"{'='*70}")
+        
+#         # Get context from memory
+#         context = self.memory.get_context(user_message)
+        
+#         # Update user profile with context
+#         self.user_profile['city'] = context['city']
+#         self.user_profile['location'] = context['location']
+        
+#         # Update recommender with new city/location
+#         self.recommender.user_city = context['city']
+#         self.recommender.user_location = context['location']
+        
+#         # Add user message to history
+#         self.messages.append({
+#             "role": "user",
+#             "content": user_message
+#         })
+        
+#         # Detect intent and decide if we need to call tools
+#         intent = self._detect_intent(user_message)
+        
+#         print(f"🧠 Detected intent: {intent}")
+        
+#         # Show memory usage if applicable
+#         if context['used_memory_for_date']:
+#             print(f"📅 Using remembered date: {self.memory.last_date_display}")
+#         if context['used_memory_for_city']:
+#             print(f"🏙️  Using remembered city: {self.memory.last_city}")
+        
+#         # Execute appropriate action based on intent
+#         if intent == "recommend":
+#             response = self._handle_recommendation(user_message, context)
+#         elif intent == "info":
+#             response = self._handle_play_info(user_message)
+#         elif intent == "search":
+#             response = self._handle_recommendation(user_message, context)
+#         elif intent == "preference":
+#             response = self._handle_preference_update(user_message)
+#         elif intent == "calendar":
+#             response = self._handle_calendar(user_message)
+#         elif intent == "web_search":
+#             response = self._handle_web_search(user_message, context)
+#         else:
+#             response = self._handle_general_chat(user_message)
+        
+#         # Update memory with this turn's context
+#         self.memory.update(
+#             city=context['city'],
+#             date_info=context['date_info']
+#         )
+        
+#         # Add assistant response to history
+#         self.messages.append({
+#             "role": "assistant",
+#             "content": response
+#         })
+        
+#         print(f"\n🎭 Agent: {response}\n")
+        
+#         return response
+    
+#     def _detect_intent(self, message):
+#         """
+#         Detect user intent using LLM
+#         Returns: recommend, info, search, preference, calendar, web_search, general
+#         """
+#         prompt = f"""Classify the user's intent into ONE of these categories:
+# - recommend: User wants play recommendations
+# - info: User wants information about a specific play
+# - search: User wants to search for plays by criteria (date, city, genre)
+# - preference: User is expressing likes/dislikes
+# - calendar: User wants to add event to calendar, check conflicts, or find free time
+# - web_search: User explicitly asks to search the web or wants current news/information
+# - general: General conversation/greeting
+
+# User message: "{message}"
+
+# Reply with ONLY one word: recommend, info, search, preference, calendar, web_search, or general
+# """
+        
+#         try:
+#             response = completion(
+#                 model="gemini/gemini-2.0-flash",
+#                 messages=[{"role": "user", "content": prompt}],
+#                 temperature=0.1
+#             )
+            
+#             intent = response.choices[0].message.content.strip().lower()
+            
+#             # Validate intent
+#             valid_intents = ['recommend', 'info', 'search', 'preference', 'calendar', 'web_search', 'general']
+#             if intent not in valid_intents:
+#                 intent = 'general'
+            
+#             return intent
+            
+#         except Exception as e:
+#             print(f"Intent detection error: {e}")
+#             return 'general'
+    
+#     def _handle_recommendation(self, message, context):
+#         """
+#         Handle recommendation requests with IMPROVED TAVILY FALLBACK
+#         Now triggers web search when:
+#         1. No plays in database for city
+#         2. No plays match the requested date
+#         3. User explicitly wants current info
+#         """
+#         # Build preference string including context
+#         preference_parts = []
+        
+#         # Extract preference from message
+#         preference_prompt = f"""Extract the user's preference from their message.
+# Focus on: genre, mood, time, or any specific requirements.
+
+# User message: "{message}"
+
+# Provide a concise preference string (e.g., "light comedy, weekend evening, romantic")
+# If no specific preference, return "general entertainment"
+# """
+        
+#         try:
+#             pref_response = completion(
+#                 model="gemini/gemini-2.0-flash",
+#                 messages=[{"role": "user", "content": preference_prompt}],
+#                 temperature=0.3
+#             )
+            
+#             preference = pref_response.choices[0].message.content.strip()
+#             preference_parts.append(preference)
+            
+#         except Exception as e:
+#             preference_parts.append("general entertainment")
+        
+#         # Add date context if available
+#         if context.get('date_info'):
+#             preference_parts.append(context['date_info']['display'])
+        
+#         # Add city context
+#         preference_parts.append(context['city'])
+        
+#         full_preference = ", ".join(preference_parts)
+#         print(f"📋 Extracted preference: {full_preference}")
+        
+#         # Check if we have plays in the requested city
+#         self.db.cursor.execute("SELECT COUNT(*) FROM plays WHERE city = ?", (context['city'],))
+#         city_count = self.db.cursor.fetchone()[0]
+        
+#         # ==================== CASE 1: NO PLAYS IN CITY ====================
+#         if city_count == 0:
+#             print(f"⚠️  No plays in database for {context['city']}")
+#             return self._search_web_fallback(context, full_preference, reason="no_city")
+        
+#         # ==================== GET RECOMMENDATIONS ====================
+#         recommendations = self.recommender.recommend(
+#             user_preference=full_preference,
+#             max_distance_km=self.user_profile['max_distance_km'],
+#             top_n=5
+#         )
+        
+#         # ==================== FILTER: Remove plays with wrong city in venue ====================
+#         # Sometimes database has plays with venues in wrong cities (e.g., "Samsun Ata Sahne" in Ankara)
+#         target_city = context['city'].lower()
+#         wrong_city_venues = ['samsun', 'mersin', 'izmir', 'istanbul', 'ankara', 'adana', 'bursa', 'antalya']
+#         wrong_city_venues = [c for c in wrong_city_venues if c != target_city]
+        
+#         filtered_recommendations = []
+#         for rec in recommendations:
+#             venue_lower = rec.get('venue', '').lower()
+            
+#             # Check if venue contains a DIFFERENT city name
+#             has_wrong_city = False
+#             for wrong_city in wrong_city_venues:
+#                 if wrong_city in venue_lower:
+#                     print(f"   ⚠️ Filtering out '{rec['title']}' - venue '{rec['venue']}' is not in {context['city']}")
+#                     has_wrong_city = True
+#                     break
+            
+#             if not has_wrong_city:
+#                 filtered_recommendations.append(rec)
+        
+#         recommendations = filtered_recommendations
+        
+#         # ==================== CASE 2: CHECK DATE MATCH ====================
+#         has_date_match = False
+#         target_date = None
+#         is_relative_date = False  # "bu hafta", "yarın", etc.
+        
+#         if context.get('date_info'):
+#             date_display = context['date_info'].get('display', '').lower()
+#             is_relative_date = any(term in date_display for term in ['bu hafta', 'yarın', 'bugün', 'hafta sonu', 'önümüzdeki'])
+            
+#             if context['date_info'].get('date_obj'):
+#                 target_date = context['date_info']['date_obj']
+#                 target_date_str = target_date.strftime("%Y-%m-%d")
+                
+#                 print(f"📅 Checking for plays on {target_date_str}...")
+                
+#                 for rec in recommendations:
+#                     if rec.get('showtimes'):
+#                         showtimes = rec['showtimes'].split('; ')
+#                         for showtime in showtimes:
+#                             showtime_date = self._parse_showtime_date(showtime)
+#                             if showtime_date and showtime_date.date() == target_date.date():
+#                                 has_date_match = True
+#                                 print(f"   ✓ Found match: {rec['title']} - {showtime}")
+#                                 break
+#                         if has_date_match:
+#                             break
+#             elif is_relative_date:
+#                 # For relative dates like "bu hafta", check if any play is within a week
+#                 from datetime import timedelta
+#                 today = datetime.now()
+#                 week_end = today + timedelta(days=7)
+                
+#                 print(f"📅 Checking for plays this week ({today.strftime('%Y-%m-%d')} to {week_end.strftime('%Y-%m-%d')})...")
+                
+#                 for rec in recommendations:
+#                     if rec.get('showtimes'):
+#                         showtimes = rec['showtimes'].split('; ')
+#                         for showtime in showtimes:
+#                             showtime_date = self._parse_showtime_date(showtime)
+#                             if showtime_date:
+#                                 if today.date() <= showtime_date.date() <= week_end.date():
+#                                     has_date_match = True
+#                                     print(f"   ✓ Found match: {rec['title']} - {showtime}")
+#                                     break
+#                         if has_date_match:
+#                             break
+            
+#             # NO DATE MATCH -> TRIGGER WEB SEARCH
+#             if not has_date_match:
+#                 date_display_text = context['date_info']['display'] if context.get('date_info') else "belirtilen tarih"
+#                 print(f"⚠️  No plays found for {date_display_text} in database")
+#                 print(f"🔍 Triggering web search for better results...")
+                
+#                 web_response = self._search_web_fallback(context, full_preference, reason="no_date_match")
+                
+#                 # Don't show low-score database alternatives for relative dates
+#                 if not is_relative_date and recommendations:
+#                     web_response += "\n\n---\n\n"
+#                     web_response += f"📚 **Veritabanındaki alternatifler** (farklı tarihlerde):\n\n"
+#                     for i, play in enumerate(recommendations[:2], 1):
+#                         web_response += f"**{i}. {play['title']}**\n"
+#                         web_response += f"📍 {play['venue']}\n"
+#                         if play.get('showtimes'):
+#                             times = play['showtimes'].split('; ')[:2]
+#                             web_response += f"📅 {', '.join(times)}\n"
+#                         if play.get('ticket_url'):
+#                             web_response += f"🎫 [Bilet Al]({play['ticket_url']})\n"
+#                         web_response += "\n"
+                
+#                 return web_response
+        
+#         # ==================== CASE 3: NO RECOMMENDATIONS AT ALL ====================
+#         if not recommendations:
+#             print(f"⚠️  No recommendations from database")
+#             return self._search_web_fallback(context, full_preference, reason="no_results")
+        
+#         # ==================== SUCCESS: FORMAT RESULTS ====================
+#         self.last_recommendations = recommendations
+        
+#         city_display = context['city']
+#         date_display = context['date_info']['display'] if context.get('date_info') else None
+        
+#         if date_display:
+#             response = f"**{city_display}** şehrinde **{date_display}** için {len(recommendations)} öneri buldum! 🎭\n\n"
+#         else:
+#             response = f"**{city_display}** şehrinde {len(recommendations)} öneri buldum! 🎭\n\n"
+        
+#         for i, play in enumerate(recommendations, 1):
+#             response += f"**{i}. {play['title']}** ⭐ {play['score']:.1f}/10\n"
+            
+#             if play.get('distance_km') is not None:
+#                 response += f"📍 {play['venue']} ({play['distance_km']} km - ~{play['duration_min']:.0f} dk)\n"
+#             else:
+#                 response += f"📍 {play['venue']}\n"
+            
+#             if play.get('showtimes'):
+#                 times = play['showtimes'].split('; ')[:2]
+#                 response += f"📅 {', '.join(times)}\n"
+            
+#             response += f"💭 {play['reasoning']}\n"
+            
+#             if play.get('ticket_url'):
+#                 response += f"🎫 [Bilet Al]({play['ticket_url']})\n"
+            
+#             response += "\n"
+        
+#         if self.calendar_agent:
+#             response += "📅 Takvime eklemek ister misiniz?"
+#         else:
+#             response += "Hangi oyun hakkında daha fazla bilgi istersiniz? 🎬"
+        
+#         return response
+    
+#     def _parse_showtime_date(self, showtime_str):
+#         """
+#         Parse a showtime string like "03 Şubat Salı 2026 20:30" into a datetime
+#         """
+#         month_map = {
+#             'ocak': 1, 'şubat': 2, 'subat': 2, 'mart': 3, 'nisan': 4,
+#             'mayıs': 5, 'mayis': 5, 'haziran': 6, 'temmuz': 7,
+#             'ağustos': 8, 'agustos': 8, 'eylül': 9, 'eylul': 9,
+#             'ekim': 10, 'kasım': 11, 'kasim': 11, 'aralık': 12, 'aralik': 12
+#         }
+        
+#         try:
+#             showtime_lower = showtime_str.lower()
+            
+#             day_match = re.match(r'(\d{1,2})', showtime_lower)
+#             if not day_match:
+#                 return None
+#             day = int(day_match.group(1))
+            
+#             month = None
+#             for month_name, month_num in month_map.items():
+#                 if month_name in showtime_lower:
+#                     month = month_num
+#                     break
+            
+#             if not month:
+#                 return None
+            
+#             year_match = re.search(r'20\d{2}', showtime_str)
+#             if year_match:
+#                 year = int(year_match.group())
+#             else:
+#                 year = datetime.now().year
+            
+#             return datetime(year, month, day)
+            
+#         except Exception as e:
+#             return None
+    
+#     def _search_web_fallback(self, context, full_preference, reason="unknown"):
+#         """
+#         Search web - SIMPLE & HONEST APPROACH
+#         Sadece AI özeti + kaynak linkler göster
+#         Oyun listesi çıkarmaya ÇALIŞMA (hatalı oluyor)
+#         """
+#         city = context['city']
+#         date_str = context['date_info']['display'] if context.get('date_info') else "bu hafta"
+        
+#         # ==================== TRY TAVILY ====================
+#         if self.tavily_agent and self.tavily_agent.is_available():
+#             print(f"🔍 Web search triggered")
+            
+#             result = self.tavily_agent.search_plays(
+#                 city=city,
+#                 date_str=date_str,
+#                 max_results=5
+#             )
+            
+#             if result.get('success'):
+#                 return self._format_simple_results(result, city, date_str)
+        
+#         # ==================== NO SEARCH AVAILABLE ====================
+#         return self._no_search_fallback(context, reason)
+    
+#     def _format_simple_results(self, result, city, date_str):
+#         """
+#         Format results - SIMPLE & HONEST with VALIDATION WARNINGS
+#         Also saves found plays to last_recommendations for calendar integration
+#         """
+#         response = f"🔍 **{city}** için **{date_str}** web araması sonuçları:\n\n"
+        
+#         # AI Summary - ANA BİLGİ
+#         ai_summary = result.get('ai_summary', '')
+#         if ai_summary:
+#             response += f"📋 **Web'den bulunan bilgi:**\n{ai_summary}\n\n"
+            
+#             # Extract play names from AI summary and save to last_recommendations
+#             self._extract_and_save_plays_from_summary(ai_summary, city, date_str, result.get('sources', []))
+#         else:
+#             response += "⚠️ Bu tarih için spesifik bilgi bulunamadı.\n\n"
+        
+#         # VALIDATION WARNINGS - Yanlış şehir/tarih uyarısı
+#         validation = result.get('validation', {})
+#         warnings = validation.get('warnings', [])
+        
+#         if warnings:
+#             response += "---\n\n"
+#             for warning in warnings:
+#                 response += f"{warning}\n\n"
+        
+#         # Disclaimer - DÜRÜSTLÜK
+#         response += "---\n\n"
+#         response += "ℹ️ **Not:** Bu bilgiler web aramasından alınmıştır. "
+#         response += "Kesin program ve bilet durumu için aşağıdaki kaynak siteleri kontrol etmenizi öneririm.\n\n"
+        
+#         # Source links - DOĞRULAMA İÇİN
+#         sources = result.get('sources', [])
+#         if sources:
+#             response += "📚 **Kaynak Siteler:**\n"
+#             for src in sources[:4]:
+#                 domain = src.get('domain', 'link')
+#                 url = src.get('url', '')
+#                 title = src.get('title', '')[:50]
+#                 response += f"   • [{domain}]({url})"
+#                 if title:
+#                     response += f" - {title}..."
+#                 response += "\n"
+        
+#         # Direct links - şehre özel
+#         response += f"\n💡 **Doğrudan kontrol için:**\n"
+#         response += f"   • [biletinial.com/{city.lower()}](https://biletinial.com/tr-tr/tiyatro/{city.lower()})\n"
+        
+#         # City-specific links
+#         if city.lower() == 'istanbul':
+#             response += f"   • [İBB Şehir Tiyatroları](https://sehirtiyatrolari.ibb.istanbul/takvim)\n"
+#         elif city.lower() == 'ankara':
+#             response += f"   • [Ankara Devlet Tiyatrosu](https://www.devtiyatro.gov.tr)\n"
+        
+#         # Add calendar prompt if plays were found
+#         if self.last_recommendations:
+#             response += f"\n📅 Yukarıdaki oyunlardan birini takvime eklemek ister misiniz?"
+        
+#         return response
+    
+#     def _extract_and_save_plays_from_summary(self, summary: str, city: str, date_str: str, sources: list):
+#         """
+#         Extract play names AND venues from AI summary and save to last_recommendations
+#         """
+#         import re
+        
+#         # Initialize if not exists
+#         if not hasattr(self, 'last_recommendations'):
+#             self.last_recommendations = []
+        
+#         # Clear previous recommendations
+#         self.last_recommendations = []
+        
+#         # Extract quoted play names
+#         quoted_plays = re.findall(r'"([^"]+)"', summary)
+#         quoted_plays += re.findall(r'"([^"]+)"', summary)
+        
+#         # Try to extract venue information from summary
+#         # Common patterns: "at [Venue]", "[Venue]'da", "[Venue] Salonu"
+#         venue_patterns = [
+#             r'at\s+([A-ZÇĞİÖŞÜa-zçğıöşü\s]+(?:Sahne|Tiyatro|Salon|Salonu|Merkezi|PSM|AKM|Kültür))',
+#             r'([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*\s+(?:Sahne|Tiyatro|Salon|Salonu|Merkezi|PSM|AKM))',
+#             r"([A-ZÇĞİÖŞÜ][a-zçğıöşü\s]+(?:Sahnesi|Salonu|Merkezi|Tiyatrosu))'?[nd]?[ae]",
+#         ]
+        
+#         extracted_venue = None
+#         for pattern in venue_patterns:
+#             venue_match = re.search(pattern, summary)
+#             if venue_match:
+#                 extracted_venue = venue_match.group(1).strip()
+#                 break
+        
+#         # Filter valid play names
+#         valid_plays = []
+#         for name in quoted_plays:
+#             name = name.strip()
+#             # Skip if too short or contains invalid words
+#             if len(name) < 3:
+#                 continue
+#             invalid_words = ['tickets', 'bilet', 'available', 'sale', 'check', 'website', 'january', 'february']
+#             if any(w in name.lower() for w in invalid_words):
+#                 continue
+#             if name not in valid_plays:
+#                 valid_plays.append(name)
+        
+#         # Find URLs for plays from sources
+#         for play_name in valid_plays[:5]:  # Max 5 plays
+#             ticket_url = None
+#             play_venue = extracted_venue  # Use venue from summary
+            
+#             # Try to find matching URL and venue from sources
+#             for src in sources:
+#                 url = src.get('url', '')
+#                 title = src.get('title', '').lower()
+                
+#                 # Check if source matches this play
+#                 play_words = [w.lower() for w in play_name.split() if len(w) > 2]
+#                 if any(w in title for w in play_words) or any(w in url.lower() for w in play_words):
+#                     ticket_url = url
+                    
+#                     # Try to extract venue from source title if not found yet
+#                     if not play_venue:
+#                         for pattern in venue_patterns:
+#                             venue_match = re.search(pattern, src.get('title', ''))
+#                             if venue_match:
+#                                 play_venue = venue_match.group(1).strip()
+#                                 break
+#                     break
+            
+#             # Add to recommendations
+#             self.last_recommendations.append({
+#                 'title': play_name,
+#                 'venue': play_venue or city,  # Fallback to city if no venue found
+#                 'city': city,
+#                 'showtimes': date_str,  # Use the searched date
+#                 'ticket_url': ticket_url or f"https://biletinial.com/tr-tr/tiyatro/{city.lower()}",
+#                 'score': 5.0,
+#                 'source': 'web_search'
+#             })
+        
+#         if self.last_recommendations:
+#             print(f"   📝 Saved {len(self.last_recommendations)} plays for calendar: {[p['title'] for p in self.last_recommendations]}")
+#             if extracted_venue:
+#                 print(f"   📍 Extracted venue: {extracted_venue}")
+    
+#     def _no_search_fallback(self, context, reason):
+#         """Fallback when no search is available"""
+#         city = context['city']
+        
+#         if reason == "no_city":
+#             return f"""Üzgünüm, **{city}** için veritabanında kayıt yok. 😔
+
+# 💡 **Öneriler:**
+#    • [biletinial.com/{city.lower()}](https://biletinial.com/tr-tr/tiyatro/{city.lower()}) sitesini ziyaret edin
+#    • Farklı bir şehir deneyin (Istanbul, Ankara)
+# """
+#         else:
+#             date_display = context['date_info']['display'] if context.get('date_info') else ""
+#             return f"""**{city}** şehrinde **{date_display}** için veritabanında kayıt bulunamadı. 😔
+
+# 💡 **Güncel program için:**
+#    • [biletinial.com/{city.lower()}](https://biletinial.com/tr-tr/tiyatro/{city.lower()})
+#    • [İBB Şehir Tiyatroları](https://sehirtiyatrolari.ibb.istanbul/takvim)
+# """
+    
+#     def _format_hybrid_results(self, result, context):
+#         """
+#         Format results - DÜRÜST YAKLAŞIM
+#         """
+#         city = context['city']
+#         date_display = context['date_info']['display'] if context.get('date_info') else None
+        
+#         # Use the formatter from hybrid agent if available
+#         if hasattr(self.hybrid_agent, 'format_results'):
+#             return self.hybrid_agent.format_results(result, city, date_display)
+        
+#         # Fallback formatting
+#         plays = result.get('plays', [])
+#         summary = result.get('summary', '')
+#         disclaimer = result.get('disclaimer', '')
+#         sources = result.get('sources', [])
+        
+#         # Header
+#         if date_display:
+#             response = f"🔍 **{city}** için **{date_display}** web araması sonuçları:\n\n"
+#         else:
+#             response = f"🔍 **{city}** için web araması sonuçları:\n\n"
+        
+#         # AI Summary (main info)
+#         if summary:
+#             response += f"📋 **Özet:**\n{summary}\n\n"
+        
+#         # Plays (if any)
+#         if plays:
+#             response += f"🎭 **Bulunan Oyunlar ({len(plays)}):**\n\n"
+            
+#             self.last_recommendations = []
+            
+#             for i, play in enumerate(plays[:5], 1):
+#                 title = play.get('title', 'Unknown')
+#                 response += f"**{i}. {title}**"
+                
+#                 # Confidence indicator
+#                 confidence = play.get('confidence', 'medium')
+#                 if confidence == 'high':
+#                     response += " ✓"
+                
+#                 response += "\n"
+                
+#                 # Ticket URL
+#                 if play.get('ticket_url'):
+#                     response += f"   🎫 [Detay/Bilet]({play['ticket_url']})\n"
+                
+#                 # Videos (only for high-confidence plays)
+#                 if play.get('videos') and confidence == 'high':
+#                     response += f"   🎬 **Röportajlar:**\n"
+#                     for video in play['videos'][:2]:
+#                         video_title = video.get('title', '')[:45]
+#                         response += f"      • [{video_title}...]({video['url']})\n"
+                
+#                 response += "\n"
+                
+#                 # Store for calendar
+#                 self.last_recommendations.append({
+#                     'title': title,
+#                     'venue': city,
+#                     'showtimes': '',
+#                     'ticket_url': play.get('ticket_url', ''),
+#                     'score': 5.0,
+#                     'source': 'web_search'
+#                 })
+#         else:
+#             response += "⚠️ Spesifik oyun bilgisi bulunamadı.\n\n"
+        
+#         # Disclaimer
+#         if disclaimer:
+#             response += f"\n{disclaimer}\n"
+        
+#         # Source links for verification
+#         if sources:
+#             response += "\n📚 **Kaynak Siteler (doğrulama için):**"
+#             for src in sources[:3]:
+#                 domain = src.get('domain', 'link')
+#                 url = src.get('url', '')
+#                 response += f"\n   • [{domain}]({url})"
+        
+#         if self.calendar_agent and plays:
+#             response += "\n\n📅 Takvime eklemek ister misiniz?"
+        
+#         return response
+    
+#     def _format_web_results(self, web_result, context):
+#         """
+#         Format Tavily web search results into a nice response
+#         IMPROVED: Shows AI summary, plays, and YouTube videos
+#         """
+#         plays = web_result.get('plays', [])
+#         city = context['city']
+#         date_display = context['date_info']['display'] if context.get('date_info') else None
+#         ai_summary = web_result.get('ai_summary', '')
+        
+#         # Header
+#         if date_display:
+#             response = f"🌐 **{city}** şehrinde **{date_display}** için web araması yaptım!\n\n"
+#         else:
+#             response = f"🌐 **{city}** şehrinde web araması yaptım!\n\n"
+        
+#         # Show AI Summary first (most useful!)
+#         if ai_summary and len(ai_summary) > 50:
+#             # Translate if English
+#             if ai_summary.startswith('This week') or 'showing' in ai_summary.lower():
+#                 response += f"🤖 **Web'den Bulunan Bilgi:**\n{ai_summary[:500]}\n\n"
+#             else:
+#                 response += f"🤖 **Özet:**\n{ai_summary[:500]}\n\n"
+#             response += "---\n\n"
+        
+#         # Show plays if found
+#         if plays:
+#             response += f"🎭 **Bulunan Oyunlar ({len(plays)}):**\n\n"
+            
+#             # Store for calendar
+#             self.last_recommendations = []
+            
+#             for i, play in enumerate(plays[:5], 1):
+#                 # Clean title (remove trailing punctuation)
+#                 title = play['title'].strip().rstrip(',').rstrip('.')
+#                 response += f"**{i}. {title}**\n"
+                
+#                 # Show venue if it's useful (not generic)
+#                 venue = play.get('venue', '')
+#                 if venue and 'web araması' not in venue.lower() and 'AI önerisi' not in venue:
+#                     response += f"   📍 {venue}\n"
+#                 elif venue and 'Tiyatroları' in venue:
+#                     response += f"   📍 {venue}\n"
+                
+#                 # Show dates if available
+#                 if play.get('showtimes'):
+#                     response += f"   📅 {play['showtimes']}\n"
+                
+#                 # Show ticket link if available
+#                 if play.get('ticket_url'):
+#                     response += f"   🎫 [Bilet Al]({play['ticket_url']})\n"
+                
+#                 # Show YouTube videos if available
+#                 if play.get('videos'):
+#                     response += f"   🎬 **Röportajlar:**\n"
+#                     for video in play['videos'][:2]:
+#                         response += f"      • [{video['title'][:50]}...]({video['url']})\n"
+                
+#                 response += "\n"
+                
+#                 # Convert to recommendation format for calendar
+#                 self.last_recommendations.append({
+#                     'title': title,
+#                     'venue': venue or city,
+#                     'showtimes': play.get('showtimes', ''),
+#                     'ticket_url': play.get('ticket_url', ''),
+#                     'score': 5.0,
+#                     'source': 'web'
+#                 })
+#         else:
+#             response += "⚠️ Spesifik oyun bilgisi bulunamadı.\n\n"
+        
+#         # Show source URLs (only if we have them and they're useful)
+#         source_urls = web_result.get('source_urls', [])
+#         # Filter out category pages
+#         useful_urls = [url for url in source_urls if not url.endswith('/tiyatro') and not url.endswith('/tiyatro/')]
+        
+#         if useful_urls:
+#             response += "📚 **Detaylı Bilgi İçin:**\n"
+#             for url in useful_urls[:3]:
+#                 site_name = url.split('/')[2].replace('www.', '')
+#                 response += f"   • [{site_name}]({url})\n"
+        
+#         # Suggest searching biletinial/biletix directly
+#         response += f"\n💡 **İpucu:** [biletinial.com/tr-tr/tiyatro/{city.lower()}](https://biletinial.com/tr-tr/tiyatro/{city.lower()}) adresinden tüm oyunları görebilirsiniz.\n"
+        
+#         if self.calendar_agent and plays:
+#             response += "\n📅 Takvime eklemek ister misiniz?"
+        
+#         return response
+    
+#     def _handle_web_search(self, message, context):
+#         """
+#         Handle explicit web search requests
+#         """
+#         if not self.tavily_agent or not self.tavily_agent.is_available():
+#             return """🔍 Web arama şu anda kullanılamıyor.
+
+# Tavily API kurulumu için:
+# 1. `pip install tavily-python`
+# 2. .env dosyasına TAVILY_API_KEY ekleyin
+
+# Alternatif olarak veritabanındaki oyunları arayabilirim! 🎭"""
+        
+#         # Check if user wants news
+#         if any(word in message.lower() for word in ['haber', 'news', 'güncel', 'yeni']):
+#             return self._get_theater_news(context['city'])
+        
+#         # Regular search
+#         date_str = context['date_info']['display'] if context.get('date_info') else None
+        
+#         result = self.tavily_agent.search_plays(
+#             city=context['city'],
+#             date_str=date_str,
+#             max_results=5
+#         )
+        
+#         if result['success'] and result['plays']:
+#             return self._format_web_results(result, context)
+#         else:
+#             return f"""🔍 Web araması sonuç vermedi.
+
+# Denenen arama: "{result.get('query', '')}"
+
+# Öneriler:
+# - Farklı bir şehir deneyin
+# - Tarih aralığını genişletin
+# - Veritabanındaki oyunları kontrol edin"""
+    
+#     def _get_theater_news(self, city=None):
+#         """
+#         Get theater news from web
+#         """
+#         if not self.tavily_agent:
+#             return "Web arama kullanılamıyor."
+        
+#         result = self.tavily_agent.search_theater_news(city=city, max_results=5)
+        
+#         if not result['success']:
+#             return f"Haber araması başarısız: {result.get('error')}"
+        
+#         news = result.get('news', [])
+        
+#         if not news:
+#             return "Güncel tiyatro haberi bulunamadı."
+        
+#         response = "📰 **Güncel Tiyatro Haberleri**\n\n"
+        
+#         for item in news:
+#             response += f"• **{item['title']}**\n"
+#             if item.get('snippet'):
+#                 response += f"  {item['snippet'][:100]}...\n"
+#             if item.get('url'):
+#                 response += f"  🔗 [Devamını Oku]({item['url']})\n"
+#             response += "\n"
+        
+#         return response
+    
+#     def _handle_play_info(self, message):
+#         """
+#         Handle requests for information about specific plays
+#         IMPROVED: Also checks last_recommendations from web search
+#         """
+#         message_lower = message.lower()
+        
+#         def normalize_text(text):
+#             text = text.lower()
+#             replacements = {
+#                 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
+#                 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'
+#             }
+#             for tr_char, ascii_char in replacements.items():
+#                 text = text.replace(tr_char, ascii_char)
+#             return text
+        
+#         message_normalized = normalize_text(message_lower)
+        
+#         # ==================== STEP 1: Check last_recommendations first ====================
+#         # This includes plays from web search
+#         if hasattr(self, 'last_recommendations') and self.last_recommendations:
+#             for play in self.last_recommendations:
+#                 title = play.get('title', '')
+#                 title_normalized = normalize_text(title.lower())
+#                 title_words = [w for w in title_normalized.split() if len(w) >= 3]
+                
+#                 # Check if play name matches
+#                 matches = sum(1 for word in title_words if word in message_normalized)
+                
+#                 if matches >= 2 or title_normalized in message_normalized:
+#                     # Found the play in recommendations
+#                     info = f"""📖 **{title}** hakkında bilgi:\n\n"""
+                    
+#                     venue = play.get('venue', 'Belirtilmemiş')
+#                     info += f"📍 **Mekan:** {venue}\n"
+                    
+#                     showtimes = play.get('showtimes', '')
+#                     if showtimes:
+#                         info += f"📅 **Tarih:** {showtimes}\n"
+                    
+#                     ticket_url = play.get('ticket_url', '')
+#                     if ticket_url:
+#                         info += f"🎫 **Biletler:** [Bilet Al]({ticket_url})\n"
+                    
+#                     # Check if this is from web search
+#                     if play.get('source') == 'web_search':
+#                         info += "\n⚠️ *Bu bilgi web aramasından alınmıştır. Kesin bilgi için bilet sitesini kontrol edin.*\n"
+                        
+#                         # Offer to fetch more details
+#                         if self.tavily_agent and self.tavily_agent.is_available():
+#                             info += "\n🔍 Daha fazla bilgi için bilet linkine tıklayın."
+#                     else:
+#                         if self.tavily_agent and self.tavily_agent.is_available():
+#                             info += "\n🔍 Web'den daha fazla bilgi istiyorsanız 'detaylı bilgi' yazın."
+#                         info += "\n🎬 YouTube'da fragman aramamı ister misiniz?"
+                    
+#                     if self.calendar_agent:
+#                         info += "\n📅 Takvime eklemek ister misiniz?"
+                    
+#                     return info
+        
+#         # ==================== STEP 2: Check database ====================
+#         plays = self.db.get_all_plays()
+        
+#         for play in plays:
+#             play_id, title, venue, genre, showtimes, ticket_url = play
+#             title_normalized = normalize_text(title.lower())
+            
+#             if title_normalized in message_normalized or any(word in message_normalized for word in title_normalized.split()[:3] if len(word) >= 3):
+#                 info = f"""📖 **{title}** hakkında bilgi:\n\n"""
+#                 info += f"📍 **Mekan:** {venue}\n"
+                
+#                 if showtimes:
+#                     times = showtimes.split('; ')[:5]
+#                     info += f"📅 **Seanslar:** {', '.join(times)}\n"
+                
+#                 if ticket_url:
+#                     info += f"🎫 **Biletler:** {ticket_url}\n"
+                
+#                 # Offer web enrichment
+#                 if self.tavily_agent and self.tavily_agent.is_available():
+#                     info += "\n🔍 Web'den daha fazla bilgi istiyorsanız 'detaylı bilgi' yazın."
+                
+#                 info += "\n🎬 YouTube'da fragman aramamı ister misiniz?"
+                
+#                 if self.calendar_agent:
+#                     info += "\n📅 Takvime eklemek ister misiniz?"
+                
+#                 return info
+        
+#         # Try web search for unknown play
+#         if self.tavily_agent and self.tavily_agent.is_available():
+#             print(f"🔍 Play not in DB, trying web search...")
+#             result = self.tavily_agent.enrich_play(message, self.user_profile['city'])
+            
+#             if result['success'] and result.get('summary'):
+#                 response = f"📖 **{message}** hakkında web'den bilgi:\n\n"
+#                 response += f"{result['summary']}\n\n"
+                
+#                 if result.get('sources'):
+#                     response += "📚 **Kaynaklar:**\n"
+#                     for src in result['sources'][:2]:
+#                         response += f"   • [{src['title']}]({src['url']})\n"
+                
+#                 return response
+        
+#         return f"'{message}' için bilgi bulamadım. Tam oyun adını söyleyebilir misiniz? 🤔"
+    
+#     def _handle_preference_update(self, message):
+#         """
+#         Handle when user expresses preferences
+#         """
+#         response = "Tercihlerinizi kaydettim! 📝\n\n"
+#         response += "Şimdi size daha iyi öneriler yapabilirim. "
+#         response += "Hangi tür oyun aramak istersiniz? 🎭"
+        
+#         return response
+    
+#     def _handle_calendar(self, message):
+#         """
+#         Handle calendar-related requests
+#         """
+#         if not self.calendar_agent:
+#             return """Üzgünüm, takvim entegrasyonu şu anda kullanılamıyor. 📅
+
+# Google Calendar API kurulumu için:
+# 1. credentials.json dosyası gerekli
+# 2. Test kullanıcısı olarak eklenmelisiniz
+
+# Yardım: https://console.cloud.google.com/"""
+        
+#         action = self._detect_calendar_action(message)
+        
+#         if action == "add_event":
+#             return self._add_to_calendar(message)
+#         elif action == "check_conflicts":
+#             return self._check_calendar_conflicts(message)
+#         elif action == "find_free_time":
+#             return self._find_free_slots()
+#         else:
+#             return """Takvim ile ilgili ne yapmamı istersiniz? 📅
+
+# Yapabileceklerim:
+# - 🎭 Önerilen oyunu takvime ekleme
+# - ⚠️  Çakışma kontrolü
+# - 🔍 Boş zaman bulma
+
+# Ne yapmamı istersiniz?"""
+    
+#     def _detect_calendar_action(self, message):
+#         """
+#         Detect what calendar action user wants
+#         """
+#         message_lower = message.lower()
+        
+#         if any(word in message_lower for word in ['ekle', 'takvim', 'calendar', 'kaydet', 'add']):
+#             return 'add_event'
+#         elif any(word in message_lower for word in ['çakış', 'müsait', 'conflict', 'busy', 'meşgul']):
+#             return 'check_conflicts'
+#         elif any(word in message_lower for word in ['boş', 'serbest', 'free', 'ne zaman']):
+#             return 'find_free_time'
+#         else:
+#             return 'unknown'
+    
+#     def _add_to_calendar(self, message):
+#         """
+#         Add play to calendar - IMPROVED VERSION for web search results
+#         """
+#         def normalize_text(text):
+#             text = text.lower()
+#             replacements = {
+#                 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
+#                 'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c'
+#             }
+#             for tr_char, ascii_char in replacements.items():
+#                 text = text.replace(tr_char, ascii_char)
+#             return text
+        
+#         if not self.last_recommendations:
+#             return "Önce bir oyun önerisi almalısınız. Hangi oyunu önereyim? 🎭"
+        
+#         # Find the play user wants to add
+#         selected_play = None
+#         message_normalized = normalize_text(message)
+        
+#         for play in self.last_recommendations:
+#             play_title_normalized = normalize_text(play['title'])
+#             title_words = [w for w in play_title_normalized.split() if len(w) >= 3]
+#             matches = sum(1 for word in title_words if word in message_normalized)
+            
+#             if matches >= 2 or play_title_normalized in message_normalized:
+#                 selected_play = play
+#                 break
+        
+#         # If no specific match, use first recommendation
+#         if not selected_play:
+#             selected_play = self.last_recommendations[0]
+        
+#         # Check if this is from web search (no detailed showtime)
+#         is_web_result = selected_play.get('source') == 'web_search'
+        
+#         # Get showtime info
+#         selected_showtime = None
+        
+#         if is_web_result:
+#             # For web results, use the searched date
+#             showtimes = selected_play.get('showtimes', '')
+            
+#             if showtimes and not any(c.isdigit() for c in showtimes):
+#                 # Just date description like "18 Ocak 2026" without time
+#                 selected_showtime = f"{showtimes} 20:00"  # Default time
+#             elif showtimes:
+#                 selected_showtime = showtimes
+#             else:
+#                 # Try to get from memory
+#                 if self.memory.last_date_display:
+#                     selected_showtime = f"{self.memory.last_date_display} 20:00"
+#                 else:
+#                     return f"""⚠️ **{selected_play['title']}** için seans bilgisi bulunamadı.
+
+# Lütfen bilet satış sitesinden kesin tarih ve saati kontrol edin:
+# 🎫 [Bilet Satış Sitesi]({selected_play.get('ticket_url', 'https://biletinial.com')})
+
+# Kesin tarih ve saati öğrendikten sonra takvime ekleyebilirim! 📅"""
+#         else:
+#             # Database result - has detailed showtimes
+#             if selected_play.get('showtimes'):
+#                 showtimes_list = selected_play['showtimes'].split('; ')
+                
+#                 # Try to find matching date from message
+#                 month_patterns = {
+#                     'ocak': ['ocak'], 'subat': ['subat', 'şubat'], 'mart': ['mart'],
+#                     'nisan': ['nisan'], 'mayis': ['mayis', 'mayıs'], 'haziran': ['haziran'],
+#                     'temmuz': ['temmuz'], 'agustos': ['agustos', 'ağustos'],
+#                     'eylul': ['eylul', 'eylül'], 'ekim': ['ekim'],
+#                     'kasim': ['kasim', 'kasım'], 'aralik': ['aralik', 'aralık']
+#                 }
+                
+#                 detected_day = None
+#                 detected_month_key = None
+                
+#                 for month_key, month_variations in month_patterns.items():
+#                     for month_var in month_variations:
+#                         pattern = r'(\d{1,2})\s+' + month_var
+#                         match = re.search(pattern, message.lower())
+#                         if match:
+#                             detected_day = int(match.group(1))
+#                             detected_month_key = month_key
+#                             break
+#                     if detected_day:
+#                         break
+                
+#                 if detected_day and detected_month_key:
+#                     for showtime in showtimes_list:
+#                         showtime_normalized = normalize_text(showtime)
+#                         showtime_day_match = re.match(r'(\d{1,2})', showtime_normalized)
+#                         if showtime_day_match:
+#                             showtime_day = int(showtime_day_match.group(1))
+#                             if showtime_day == detected_day and detected_month_key in showtime_normalized:
+#                                 selected_showtime = showtime
+#                                 break
+                
+#                 if not selected_showtime:
+#                     selected_showtime = showtimes_list[0]
+#             else:
+#                 return "Bu oyun için seans bilgisi bulunamadı. 😔"
+        
+#         # Parse date and time
+#         parts = selected_showtime.rsplit(' ', 1)
+#         if len(parts) == 2 and ':' in parts[1]:
+#             show_date = parts[0]
+#             show_time = parts[1]
+#         else:
+#             show_date = selected_showtime
+#             show_time = "20:00"
+        
+#         # Add to calendar
+#         result = self.calendar_agent.add_event(
+#             play_title=selected_play['title'],
+#             venue=selected_play.get('venue', 'Belirtilmemiş'),
+#             show_date=show_date,
+#             show_time=show_time,
+#             ticket_url=selected_play.get('ticket_url')
+#         )
+        
+#         if result.get('success'):
+#             response = f"""✅ **Takvime eklendi!**
+
+# 🎭 **{selected_play['title']}**
+# 📍 {selected_play.get('venue', 'Belirtilmemiş')}
+# 📅 {show_date} - {show_time}
+
+# 🔔 **Hatırlatıcılar ayarlandı:**
+# • 1 gün önce
+# • 1 saat önce
+
+# 🔗 [Google Calendar'da Görüntüle]({result.get('event_link')})"""
+
+#             if is_web_result:
+#                 response += f"""
+
+# ⚠️ **Not:** Bu bilgi web aramasından alındı. Kesin saat için bilet sitesini kontrol edin:
+# 🎫 [Bilet Al]({selected_play.get('ticket_url', '#')})"""
+            
+#             response += "\n\nBaşka bir yardım? 😊"
+#             return response
+#         else:
+#             return f"❌ Takvime eklenirken hata oluştu: {result.get('error')}"
+    
+#     def _check_calendar_conflicts(self, message):
+#         """Check calendar conflicts"""
+#         if not self.last_recommendations:
+#             return "Önce bir oyun önerisi almalısınız. 🎭"
+        
+#         conflicts_found = []
+        
+#         for play in self.last_recommendations[:3]:
+#             if play.get('showtimes'):
+#                 first_showtime = play['showtimes'].split('; ')[0]
+#                 parts = first_showtime.rsplit(' ', 1)
+                
+#                 if len(parts) == 2:
+#                     show_date = parts[0]
+#                     show_time = parts[1]
+                    
+#                     result = self.calendar_agent.check_conflicts(show_date, show_time)
+                    
+#                     if result.get('has_conflict'):
+#                         conflicts_found.append({
+#                             'play': play['title'],
+#                             'date': show_date,
+#                             'time': show_time,
+#                             'conflicts': result.get('conflicts', [])
+#                         })
+        
+#         if not conflicts_found:
+#             return "✅ **Önerilen oyunların hepsi için takvimde çakışma yok!**\n\nMüsaitsiniz! 🎉"
+#         else:
+#             response = "⚠️  **Bazı oyunlar için takvimde çakışma var:**\n\n"
+#             for conflict in conflicts_found:
+#                 response += f"🎭 **{conflict['play']}**\n"
+#                 response += f"📅 {conflict['date']} {conflict['time']}\n"
+#                 response += f"❌ **Çakışan etkinlikler:**\n"
+#                 for event in conflict['conflicts'][:2]:
+#                     response += f"   • {event['title']}\n"
+#                 response += "\n"
+            
+#             response += "Başka tarihler önerebilirim! 📅"
+#             return response
+    
+#     def _find_free_slots(self):
+#         """Find free time slots"""
+#         result = self.calendar_agent.find_free_slots(datetime.now(), days=7)
+        
+#         if result.get('error'):
+#             return f"❌ Hata: {result['error']}"
+        
+#         free_slots = result.get('free_slots', [])
+        
+#         if not free_slots:
+#             return "Önümüzdeki 7 gün içinde akşam saatlerinde boş slot bulunamadı. 😔"
+        
+#         response = f"✅ **Önümüzdeki 7 günde {len(free_slots)} boş akşam slotu bulundu:**\n\n"
+        
+#         for slot in free_slots[:10]:
+#             response += f"📅 {slot['date']} ({slot['day_name']}) - {slot['time']}\n"
+        
+#         response += "\n🎭 Bu saatler için oyun önerisi istiyorsanız söyleyin!"
+        
+#         return response
+    
+#     def _handle_general_chat(self, message):
+#         """Handle general conversation"""
+#         messages = [
+#             {"role": "system", "content": self.system_prompt}
+#         ] + self.messages
+        
+#         try:
+#             response = completion(
+#                 model="gemini/gemini-2.0-flash",
+#                 messages=messages,
+#                 temperature=0.7
+#             )
+            
+#             return response.choices[0].message.content.strip()
+            
+#         except Exception as e:
+#             return "Özür dilerim, bir hata oluştu. Lütfen tekrar dener misiniz? 🙏"
+    
+#     def close(self):
+#         """Clean up"""
+#         self.db.close()
+
+
+# def demo():
+#     """Interactive demo"""
+#     print("\n" + "="*70)
+#     print("  🎭 STAGEAGENT - CONVERSATIONAL THEATER ASSISTANT")
+#     print("  NOW WITH CALENDAR + WEB SEARCH INTEGRATION! 📅🔍")
+#     print("="*70)
+#     print("  Type 'quit' to exit")
+#     print("="*70 + "\n")
+    
+#     agent = TheaterAgent()
+    
+#     print("🎭 Agent: Merhaba! Ben StageAgent, tiyatro asistanınız! 🎭")
+#     print("         Size Türkiye'deki harika oyunları önermek için buradayım.")
+#     print("         🏙️  Desteklenen şehirler: İstanbul, Ankara, İzmir, Adana, Bursa...")
+#     if agent.calendar_agent:
+#         print("         📅 Takvim entegrasyonu aktif!")
+#     if agent.tavily_agent:
+#         print("         🔍 Web arama aktif - veritabanında yoksa web'den ararım!")
+#     print("         Nasıl bir oyun arıyorsunuz?\n")
+    
+#     while True:
+#         try:
+#             user_input = input("You: ").strip()
+            
+#             if not user_input:
+#                 continue
+            
+#             if user_input.lower() in ['quit', 'exit', 'bye', 'çıkış']:
+#                 print("\n🎭 Agent: Görüşmek üzere! İyi seyirler! 🎬\n")
+#                 break
+            
+#             agent.chat(user_input)
+            
+#         except KeyboardInterrupt:
+#             print("\n\n🎭 Agent: Görüşmek üzere! İyi seyirler! 🎬\n")
+#             break
+#         except Exception as e:
+#             print(f"\n❌ Error: {e}\n")
+    
+#     agent.close()
+
+
+# if __name__ == "__main__":
+#     import sys
+    
+#     if len(sys.argv) > 1 and sys.argv[1] == "--test":
+#         agent = TheaterAgent()
+#         agent.chat("yarın Adana'da hangi oyunlar var?")
+#         agent.chat("tiyatro haberleri")
+#         agent.close()
+#     else:
+#         demo()
+
+#---------------------------------14--------------------------------------
+
+# src/conversational_agent.py   
 """
 StageAgent - Conversational Theater Recommendation Agent
 Natural language interface for finding theater plays
@@ -16290,7 +17929,14 @@ Current date: {current_date}
         elif intent == "info":
             response = self._handle_play_info(user_message)
         elif intent == "search":
-            response = self._handle_recommendation(user_message, context)
+            # Check if user explicitly wants web search
+            web_keywords = ['web search', 'web\'den', 'webden', 'internette', 'internetten', 
+                           'tavily', 'online ara', 'sitelerden', 'biletinial\'dan']
+            if any(kw in user_message.lower() for kw in web_keywords):
+                print("🌐 User explicitly requested web search")
+                response = self._handle_explicit_web_search(user_message, context)
+            else:
+                response = self._handle_recommendation(user_message, context)
         elif intent == "preference":
             response = self._handle_preference_update(user_message)
         elif intent == "calendar":
@@ -16677,7 +18323,8 @@ If no specific preference, return "general entertainment"
     
     def _extract_and_save_plays_from_summary(self, summary: str, city: str, date_str: str, sources: list):
         """
-        Extract play names AND venues from AI summary and save to last_recommendations
+        Extract play names AND venues from AI summary AND source links
+        IMPROVED: Also extracts plays from source link titles
         """
         import re
         
@@ -16688,12 +18335,11 @@ If no specific preference, return "general entertainment"
         # Clear previous recommendations
         self.last_recommendations = []
         
-        # Extract quoted play names
+        # ==================== STEP 1: Extract from AI summary (quoted names) ====================
         quoted_plays = re.findall(r'"([^"]+)"', summary)
         quoted_plays += re.findall(r'"([^"]+)"', summary)
         
         # Try to extract venue information from summary
-        # Common patterns: "at [Venue]", "[Venue]'da", "[Venue] Salonu"
         venue_patterns = [
             r'at\s+([A-ZÇĞİÖŞÜa-zçğıöşü\s]+(?:Sahne|Tiyatro|Salon|Salonu|Merkezi|PSM|AKM|Kültür))',
             r'([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜa-zçğıöşü]+)*\s+(?:Sahne|Tiyatro|Salon|Salonu|Merkezi|PSM|AKM))',
@@ -16707,50 +18353,84 @@ If no specific preference, return "general entertainment"
                 extracted_venue = venue_match.group(1).strip()
                 break
         
-        # Filter valid play names
-        valid_plays = []
+        # ==================== STEP 2: Extract from source link titles ====================
+        # Source titles often contain play names like "Fabrikada Cinayet Tiyatro Oyunu Biletleri"
+        source_plays = []
+        
+        for src in sources:
+            title = src.get('title', '')
+            url = src.get('url', '')
+            
+            # Skip category/venue pages
+            if any(skip in title.lower() for skip in ['tiyatro oyunları', 'etkinlik takvimi', 'mekan', '| mekan']):
+                continue
+            
+            # Extract play name from title
+            # Pattern: "Play Name Tiyatro Oyunu Biletleri" or "Play Name Biletleri"
+            play_match = re.match(r'^(.+?)\s*(?:Tiyatro Oyunu Biletleri|Biletleri|Devlet Tiyatrosu Oyunu)', title)
+            if play_match:
+                play_name = play_match.group(1).strip()
+                
+                # Clean up the name
+                play_name = re.sub(r'\s*\|.*$', '', play_name)  # Remove "| biletinial" etc
+                
+                if len(play_name) >= 3 and play_name not in source_plays:
+                    source_plays.append({
+                        'title': play_name,
+                        'url': url
+                    })
+        
+        # ==================== STEP 3: Combine and deduplicate ====================
+        all_plays = []
+        seen_titles = set()
+        
+        # First add quoted plays from AI summary (higher confidence)
         for name in quoted_plays:
             name = name.strip()
-            # Skip if too short or contains invalid words
             if len(name) < 3:
                 continue
             invalid_words = ['tickets', 'bilet', 'available', 'sale', 'check', 'website', 'january', 'february']
             if any(w in name.lower() for w in invalid_words):
                 continue
-            if name not in valid_plays:
-                valid_plays.append(name)
-        
-        # Find URLs for plays from sources
-        for play_name in valid_plays[:5]:  # Max 5 plays
-            ticket_url = None
-            play_venue = extracted_venue  # Use venue from summary
             
-            # Try to find matching URL and venue from sources
-            for src in sources:
-                url = src.get('url', '')
-                title = src.get('title', '').lower()
+            name_lower = name.lower()
+            if name_lower not in seen_titles:
+                seen_titles.add(name_lower)
                 
-                # Check if source matches this play
-                play_words = [w.lower() for w in play_name.split() if len(w) > 2]
-                if any(w in title for w in play_words) or any(w in url.lower() for w in play_words):
-                    ticket_url = url
-                    
-                    # Try to extract venue from source title if not found yet
-                    if not play_venue:
-                        for pattern in venue_patterns:
-                            venue_match = re.search(pattern, src.get('title', ''))
-                            if venue_match:
-                                play_venue = venue_match.group(1).strip()
-                                break
-                    break
-            
-            # Add to recommendations
+                # Find URL for this play
+                ticket_url = None
+                for src in sources:
+                    if name.lower() in src.get('title', '').lower() or name.lower().replace(' ', '-') in src.get('url', '').lower():
+                        ticket_url = src.get('url')
+                        break
+                
+                all_plays.append({
+                    'title': name,
+                    'venue': extracted_venue or city,
+                    'ticket_url': ticket_url,
+                    'source': 'ai_summary'
+                })
+        
+        # Then add plays from source links
+        for play_info in source_plays:
+            name_lower = play_info['title'].lower()
+            if name_lower not in seen_titles:
+                seen_titles.add(name_lower)
+                all_plays.append({
+                    'title': play_info['title'],
+                    'venue': city,
+                    'ticket_url': play_info['url'],
+                    'source': 'source_link'
+                })
+        
+        # ==================== STEP 4: Save to last_recommendations ====================
+        for play in all_plays[:6]:  # Max 6 plays
             self.last_recommendations.append({
-                'title': play_name,
-                'venue': play_venue or city,  # Fallback to city if no venue found
+                'title': play['title'],
+                'venue': play.get('venue', city),
                 'city': city,
-                'showtimes': date_str,  # Use the searched date
-                'ticket_url': ticket_url or f"https://biletinial.com/tr-tr/tiyatro/{city.lower()}",
+                'showtimes': date_str,
+                'ticket_url': play.get('ticket_url') or f"https://biletinial.com/tr-tr/tiyatro/{city.lower()}",
                 'score': 5.0,
                 'source': 'web_search'
             })
@@ -17023,6 +18703,41 @@ Denenen arama: "{result.get('query', '')}"
             response += "\n"
         
         return response
+    
+    def _handle_explicit_web_search(self, message, context):
+        """
+        Handle when user explicitly requests web search
+        Bypasses database and goes directly to Tavily
+        """
+        if not self.tavily_agent or not self.tavily_agent.is_available():
+            return """🔍 Web arama şu anda kullanılamıyor.
+
+Tavily API kurulumu için:
+1. `pip install tavily-python`
+2. .env dosyasına TAVILY_API_KEY ekleyin"""
+        
+        city = context['city']
+        date_str = context['date_info']['display'] if context.get('date_info') else "bu hafta"
+        
+        print(f"🔍 Explicit web search for {city}, {date_str}")
+        
+        # Go directly to web search
+        result = self.tavily_agent.search_plays(
+            city=city,
+            date_str=date_str,
+            max_results=8
+        )
+        
+        if result.get('success'):
+            return self._format_simple_results(result, city, date_str)
+        else:
+            return f"""🔍 Web araması başarısız oldu.
+
+Hata: {result.get('error', 'Bilinmeyen hata')}
+
+💡 Alternatif olarak doğrudan siteleri ziyaret edebilirsiniz:
+   • [biletinial.com/{city.lower()}](https://biletinial.com/tr-tr/tiyatro/{city.lower()})
+   • [biletix.com](https://www.biletix.com)"""
     
     def _handle_play_info(self, message):
         """
