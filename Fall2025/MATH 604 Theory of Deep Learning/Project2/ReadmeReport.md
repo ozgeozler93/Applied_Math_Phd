@@ -114,6 +114,12 @@ The `inference.py` script is used to perform segmentation on new images using a 
 
 The script loads the trained model from the specified checkpoint, preprocesses the input images from the `to-test/` directory, and generates segmentation masks. The output masks are saved in the `inference_results/` directory.
 
+## Performance Metrics
+The model was evaluated on a held-out test set using the Intersection over Union (IoU) metric.
+
+- **Mean IoU:** 0.6798
+- **Best Case (272.png):** 0.7675
+- **Observation:** The model performs exceptionally well on rectangular structures but requires further optimization for dense urban clusters where building shadows can be confused with rooftops.
 ---
 
 ## 7. Results & Discussion
