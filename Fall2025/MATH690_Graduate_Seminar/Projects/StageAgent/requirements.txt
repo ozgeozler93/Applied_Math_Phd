@@ -1,0 +1,36 @@
+# LLM Integration
+litellm>=1.0.0
+
+# Environment Variables
+python-dotenv>=1.0.0
+
+# Future: Web Scraping
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+
+# Future: Database
+sqlalchemy>=2.0.0
+
+# Future: UI
+streamlit>=1.28.0
+
+# Future: Caching
+redis>=5.0.0
+
+# Future: Data Formatting
+tabulate>=0.9.0
+pandas>=2.0.0   
+numpy>=1.25.0
+
+# Future: Logging
+loguru>=0.7.0               
+
+# Future: Enhanced Console Output
+rich>=13.0.0
+
+# Future: Date and Time Handling
+python-dateutil>=2.9.0
+
+# Future: Fuzzy Matching
+rapidfuzz>3.0.0
+
