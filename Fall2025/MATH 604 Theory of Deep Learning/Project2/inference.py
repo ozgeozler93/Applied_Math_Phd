@@ -12,9 +12,9 @@ LABEL_DIR = "labels"  # Etiketlerin olduğu klasör
 def calculate_iou(pred_mask, true_mask):
     """Intersection over Union (IoU) hesaplayan fonksiyon"""
     # Pred_mask zaten 0-1 arasında threshold uygulanmış geliyor
-    pred_mask = (pred_mask > 0.5).astype(np.uint8)
+    # pred_mask = (pred_mask > 0.8).astype(np.uint8)
     # True_mask'ı (label) binary hale getiriyoruz
-    true_mask = (true_mask > 0).astype(np.uint8) # Etiketler genellikle 0-255 arasındadır
+    true_mask = (true_mask > 127).astype(np.uint8) # Etiketler genellikle 0-255 arasındadır
         
     intersection = np.logical_and(pred_mask, true_mask).sum()
     union = np.logical_or(pred_mask, true_mask).sum()
@@ -90,3 +90,4 @@ def run_inference():
 
 if __name__ == "__main__":
     run_inference()
+
