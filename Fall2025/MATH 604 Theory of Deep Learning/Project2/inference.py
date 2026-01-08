@@ -55,7 +55,7 @@ def run_inference():
                 output = torch.sigmoid(model(input_tensor))
                 # Hassasiyeti artırmak için eşiği 0.3'e çektik
                 mask_np = output.squeeze().cpu().numpy()
-                mask_binary = (mask_np > 0.8).astype(np.uint8)
+                mask_binary = (mask_np > 0.5).astype(np.uint8)
             
             # --- IoU HESAPLAMA BÖLÜMÜ ---
             label_path = os.path.join(LABEL_DIR, img_name)

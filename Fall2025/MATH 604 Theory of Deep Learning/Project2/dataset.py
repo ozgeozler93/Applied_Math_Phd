@@ -17,13 +17,22 @@ from torch.utils.data import Dataset
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
+import torch
+from torch.utils.data import Dataset, DataLoader
+import os
+import numpy as np
+from PIL import Image
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
 class SegmentationDataset(Dataset):
     def __init__(self, image_dir, mask_dir, height, width, is_train=True):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
-        self.image_filenames = sorted(os.listdir(image_dir))
+        # Gizli dosyaları (örn: .DS_Store) elemek için filtreleme
+        self.image_filenames = sorted([f for f in os.listdir(image_dir) if f.endswith(('.png', '.jpg', '.jpeg'))])
         
-        # ImageNet standartlarında normalizasyon
+        # Standart Normalizasyon
         norm_transform = [
             A.Resize(height, width),
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -31,10 +40,27 @@ class SegmentationDataset(Dataset):
         ]
         
         if is_train:
+            # Gelişmiş Augmentation Pipeline
             self.transform = A.Compose([
+                # Geometrik Dönüşümler (Uydu verisi her yöne bakabilir)
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
+                A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=45, p=0.5),
+                
+                # Renk ve Işık Değişimleri (Farklı gün saatlerini simüle eder)
+                A.RandomBrightnessContrast(p=0.3),
+                A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3),
+                A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.3),
+                
+                # Gürültü ve Netlik (Sensör hatalarını simüle eder)
+                A.GaussNoise(p=0.2),
+                A.OneOf([
+                    A.MotionBlur(p=0.2),
+                    A.MedianBlur(blur_limit=3, p=0.1),
+                    A.Blur(blur_limit=3, p=0.1),
+                ], p=0.2),
+                
                 *norm_transform
             ])
         else:
@@ -44,16 +70,18 @@ class SegmentationDataset(Dataset):
         return len(self.image_filenames)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.image_dir, self.image_filenames[idx])
-        mask_path = os.path.join(self.mask_dir, self.image_filenames[idx])
+        img_name = self.image_filenames[idx]
+        img_path = os.path.join(self.image_dir, img_name)
+        mask_path = os.path.join(self.mask_dir, img_name)
         
         image = np.array(Image.open(img_path).convert("RGB"))
         mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
+        
+        # Maskeyi 0-1 aralığına normalize et
         mask = mask / 255.0 if mask.max() > 1.0 else mask
 
         augmented = self.transform(image=image, mask=mask)
         return augmented["image"], augmented["mask"]
-
 
 if __name__ == '__main__':
     # This block is for testing the dataset class.
