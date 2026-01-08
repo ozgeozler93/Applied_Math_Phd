@@ -3,7 +3,7 @@ from torchvision import transforms
 from PIL import Image
 import os
 import numpy as np
-from model import UNet
+from model import AttentionUNet
 
 # Ayarlar
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
@@ -19,7 +19,7 @@ def calculate_iou(pred_mask, true_mask):
     return intersection / union
 
 def run_tuning():
-    model = UNet(n_channels=3, n_classes=1).to(DEVICE)
+    model = AttentionUNet(n_channels=3, n_classes=1).to(DEVICE)
     if not os.path.exists(MODEL_PATH):
         print("Hata: model bulunamadı.")
         return

@@ -23,26 +23,12 @@ class SegmentationDataset(Dataset):
         if is_train:
             # Gelişmiş Augmentation Pipeline
             self.transform = A.Compose([
-                # Geometrik Dönüşümler (Uydu verisi her yöne bakabilir)
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
-                A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=45, p=0.5),
-                A.GridDistortion(p=0.5),
-                A.ElasticTransform(p=0.5, alpha=120, sigma=120 * 0.05),
-
-                
-                # Renk ve Işık Değişimleri (Farklı gün saatlerini simüle eder)
-                A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.5),
-                
-                # Gürültü ve Netlik (Sensör hatalarını simüle eder)
+                A.CLAHE(p=0.5),
                 A.GaussNoise(p=0.2),
-                A.OneOf([
-                    A.MotionBlur(p=0.2),
-                    A.MedianBlur(blur_limit=3, p=0.1),
-                    A.Blur(blur_limit=3, p=0.1),
-                ], p=0.2),
-                
+                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
                 *norm_transform
             ])
         else:
@@ -69,8 +55,8 @@ if __name__ == '__main__':
     # Bu blok, dataset sınıfını test etmek içindir.
     # Yalnızca bu betiği doğrudan çalıştırdığınızda çalışır.
     
-    IMAGE_HEIGHT = 256
-    IMAGE_WIDTH = 256
+    IMAGE_HEIGHT = 512
+    IMAGE_WIDTH = 512
     
     print("Dataset sınıfı test ediliyor...")
     

@@ -5,3 +5,6 @@ numpy
 albumentations
 tqdm
 matplotlib
+segmentation-models-pytorch
+pretrainedmodels
+timm

@@ -10,12 +10,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from dataset import SegmentationDataset
-from model import UNet
+from model import AttentionUNet
 
 # --- Ayarlar ---
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 LEARNING_RATE = 5e-5 # Attention U-Net için biraz daha düşük bir LR daha stabil olabilir
-BATCH_SIZE = 8
+BATCH_SIZE = 4
 NUM_EPOCHS = 100
 IMAGE_SIZE = 256
 CHECKPOINT_DIR = "checkpoints"
@@ -95,14 +95,14 @@ def main():
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
 
-    model = UNet(n_channels=3, n_classes=1).to(DEVICE)
+    model = AttentionUNet(in_channels=3, out_channels=1).to(DEVICE)
     
     # Yeni Hibrit Kayıp Fonksiyonları: Focal + Dice
     focal_fn = FocalLoss(alpha=0.25, gamma=2.5)
     dice_fn = DiceLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.1)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=1e-6)
 
     start_epoch = 1
     best_loss = float("inf")
@@ -110,15 +110,7 @@ def main():
     early_stopping_patience = 10
     early_stopping_counter = 0
 
-    if os.path.exists(CHECKPOINT_PATH):
-        print(">>> Kayıtlı model bulundu, eğitim devam ettiriliyor...")
-        checkpoint = torch.load(CHECKPOINT_PATH)
-        model.load_state_dict(checkpoint["model_state_dict"], strict=False)
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch = checkpoint.get("epoch", 1) + 1
-        best_loss = checkpoint.get("loss", float("inf"))
-        train_losses = checkpoint.get("train_losses", [])
-        val_losses = checkpoint.get("val_losses", [])
+
 
     for epoch in range(start_epoch, NUM_EPOCHS + 1):
         model.train()
@@ -147,7 +139,7 @@ def main():
         val_losses.append(val_loss)
         print(f"Validation Loss: {val_loss:.4f}, Mean IoU: {mean_iou:.4f}")
 
-        scheduler.step(val_loss)
+        scheduler.step()
 
         if val_loss < best_loss:
             best_loss = val_loss

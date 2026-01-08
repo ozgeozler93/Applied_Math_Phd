@@ -4,7 +4,7 @@ from torchvision import transforms
 from PIL import Image
 import os
 import numpy as np
-from model import UNet
+from model import AttentionUNet
 import cv2
 
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
@@ -18,28 +18,48 @@ def calculate_iou(pred_mask, true_mask):
     return intersection / union if union > 0 else 1.0
 
 def tta_predict(model, image_tensor):
-    """Test Time Augmentation ile tahmin yapar."""
+    """Test Time Augmentation with flips and multi-scale."""
     model.eval()
+    
+    original_size = image_tensor.shape[-2:]
+    predictions = []
+
     with torch.no_grad():
-        # 1. Orijinal Görüntü
-        original_output = torch.sigmoid(model(image_tensor.to(DEVICE)))
+        # Define augmentations (original, horizontal flip, vertical flip)
+        tensors = [
+            image_tensor,
+            torch.flip(image_tensor, [3]),
+            torch.flip(image_tensor, [2])
+        ]
 
-        # 2. Yatay Çevrilmiş Görüntü
-        h_flipped_tensor = torch.flip(image_tensor, [3])
-        h_flipped_output = torch.sigmoid(model(h_flipped_tensor.to(DEVICE)))
-        h_flipped_output = torch.flip(h_flipped_output, [3]) # Geri çevir
+        # Define how to reverse the augmentation for the output mask
+        revert_ops = [
+            lambda x: x,
+            lambda x: torch.flip(x, [3]),
+            lambda x: torch.flip(x, [2])
+        ]
 
-        # 3. Dikey Çevrilmiş Görüntü
-        v_flipped_tensor = torch.flip(image_tensor, [2])
-        v_flipped_output = torch.sigmoid(model(v_flipped_tensor.to(DEVICE)))
-        v_flipped_output = torch.flip(v_flipped_output, [2]) # Geri çevir
+        scales = [0.8, 1.0, 1.2]
+
+        for i, tensor in enumerate(tensors):
+            for scale in scales:
+                new_size = (int(original_size[0] * scale), int(original_size[1] * scale))
+                
+                # Scale, predict, and scale back
+                scaled_tensor = F.interpolate(tensor, size=new_size, mode='bilinear', align_corners=False)
+                output = torch.sigmoid(model(scaled_tensor.to(DEVICE)))
+                output = F.interpolate(output, size=original_size, mode='bilinear', align_corners=False)
+                
+                # Revert augmentation and add to list
+                predictions.append(revert_ops[i](output))
+
+        # Average all predictions
+        ensembled_output = torch.mean(torch.stack(predictions), dim=0)
         
-        # Tahminlerin ortalamasını al
-        ensembled_output = (original_output + h_flipped_output + v_flipped_output) / 3.0
     return ensembled_output
 
 def run_inference():
-    model = UNet(n_channels=3, n_classes=1).to(DEVICE)
+    model = AttentionUNet(in_channels=3, n_classes=1).to(DEVICE)
     if not os.path.exists(MODEL_PATH):
         print(f"Hata: {MODEL_PATH} bulunamadı.")
         return
