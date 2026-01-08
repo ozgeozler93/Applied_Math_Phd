@@ -1,25 +1,25 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 import os
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
-# Kendi dosyalarımızdan import ediyoruz
 from dataset import SegmentationDataset
-from model import UNet 
-
+from model import UNet
 
 # --- Ayarlar ---
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 5e-5 # Attention U-Net için biraz daha düşük bir LR daha stabil olabilir
 BATCH_SIZE = 8
-NUM_EPOCHS = 50
+NUM_EPOCHS = 100
 IMAGE_SIZE = 256
 CHECKPOINT_DIR = "checkpoints"
-
-
-
+CHECKPOINT_PATH = os.path.join(CHECKPOINT_DIR, "best_model.pth")
 
 class DiceLoss(nn.Module):
     def __init__(self, smooth=1e-6):
@@ -28,95 +28,156 @@ class DiceLoss(nn.Module):
 
     def forward(self, preds, targets):
         preds = torch.sigmoid(preds)
-        
-        # Flatten (Düzleştirme)
         preds = preds.view(-1)
         targets = targets.view(-1)
-        
         intersection = (preds * targets).sum()
         dice = (2. * intersection + self.smooth) / (preds.sum() + targets.sum() + self.smooth)
-        
         return 1 - dice
 
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=0.8, gamma=2, reduction='mean'):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
 
-def check_accuracy(loader, model, bce_fn, dice_fn, device):
+    def forward(self, inputs, targets):
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        pt = torch.exp(-BCE_loss)
+        F_loss = self.alpha * (1 - pt)**self.gamma * BCE_loss
+        
+        if self.reduction == 'mean':
+            return torch.mean(F_loss)
+        elif self.reduction == 'sum':
+            return torch.sum(F_loss)
+        else:
+            return F_loss
+
+def evaluate_model(loader, model, focal_fn, dice_fn, device):
     model.eval()
     val_loss = 0
+    total_iou = 0
+    num_samples = 0
     with torch.no_grad():
         for x, y in loader:
             x, y = x.to(device), y.to(device).unsqueeze(1)
             preds = model(x)
 
-            # Doğrulama sırasında da aynı hibrit kaybı hesaplıyoruz
-            loss_bce = bce_fn(preds, y)
+            loss_focal = focal_fn(preds, y)
             loss_dice = dice_fn(preds, y)
-            loss = (0.5 * loss_bce) + (0.5 * loss_dice)
-            
+            loss = (0.5 * loss_focal) + (0.5 * loss_dice)
             val_loss += loss.item()
+            
+            preds_prob = torch.sigmoid(preds)
+            preds_binary = (preds_prob > 0.5).float()
+            
+            intersection = (preds_binary * y).sum(dim=(1, 2, 3))
+            union = preds_binary.sum(dim=(1, 2, 3)) + y.sum(dim=(1, 2, 3)) - intersection
+            iou = (intersection + 1e-6) / (union + 1e-6)
+            
+            total_iou += iou.sum().item()
+            num_samples += y.size(0)
+            
     model.train()
-    return val_loss / len(loader)
+    avg_loss = val_loss / len(loader)
+    mean_iou = total_iou / num_samples
+    return avg_loss, mean_iou
 
 def main():
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
     print(f"Eğitim başlıyor... Cihaz: {DEVICE}")
 
-    # Dataset ve Loader
     full_dataset = SegmentationDataset("images", "labels", IMAGE_SIZE, IMAGE_SIZE, is_train=True)
     train_size = int(0.9 * len(full_dataset))
     val_size = len(full_dataset) - train_size
     train_set, val_set = random_split(full_dataset, [train_size, val_size])
 
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=2)
 
-    # Model Tanımlama (Parametreler model.py ile uyumlu)
     model = UNet(n_channels=3, n_classes=1).to(DEVICE)
     
-    # Hibrit Kayıp Fonksiyonları
-    bce_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([5.0]).to(DEVICE))
+    # Yeni Hibrit Kayıp Fonksiyonları: Focal + Dice
+    focal_fn = FocalLoss(alpha=0.25, gamma=2.5)
     dice_fn = DiceLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    
-    # OneCycleLR: Hızlı yakınsama sağlar
-    scheduler = optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr=LEARNING_RATE, steps_per_epoch=len(train_loader), epochs=NUM_EPOCHS
-    )
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.1)
 
+    start_epoch = 1
     best_loss = float("inf")
+    train_losses, val_losses = [], []
+    early_stopping_patience = 10
+    early_stopping_counter = 0
 
-    for epoch in range(1, NUM_EPOCHS + 1):
+    if os.path.exists(CHECKPOINT_PATH):
+        print(">>> Kayıtlı model bulundu, eğitim devam ettiriliyor...")
+        checkpoint = torch.load(CHECKPOINT_PATH)
+        model.load_state_dict(checkpoint["model_state_dict"], strict=False)
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch = checkpoint.get("epoch", 1) + 1
+        best_loss = checkpoint.get("loss", float("inf"))
+        train_losses = checkpoint.get("train_losses", [])
+        val_losses = checkpoint.get("val_losses", [])
+
+    for epoch in range(start_epoch, NUM_EPOCHS + 1):
         model.train()
         loop = tqdm(train_loader, desc=f"Epoch {epoch}/{NUM_EPOCHS}")
-        
         epoch_loss = 0
+
         for batch_idx, (data, targets) in enumerate(loop):
             data, targets = data.to(DEVICE), targets.to(DEVICE).unsqueeze(1)
-
             predictions = model(data)
 
-            # Hibrit Kayıp Hesaplama (BCE + Dice)
-            loss_bce = bce_fn(predictions, targets)
+            loss_focal = focal_fn(predictions, targets)
             loss_dice = dice_fn(predictions, targets)
-            loss = (0.5 * loss_bce) + (0.5 * loss_dice)
+            loss = (0.5 * loss_focal) + (0.5 * loss_dice)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            scheduler.step()
 
             epoch_loss += loss.item()
             loop.set_postfix(loss=loss.item())
 
-        # Her epoch sonunda doğrulama
-        val_loss = check_accuracy(val_loader, model, bce_fn, dice_fn, DEVICE)
-        print(f"Validation Loss: {val_loss:.4f}")
+        avg_epoch_loss = epoch_loss / len(train_loader)
+        train_losses.append(avg_epoch_loss)
 
-        # En iyi modeli kaydet
+        val_loss, mean_iou = evaluate_model(val_loader, model, focal_fn, dice_fn, DEVICE)
+        val_losses.append(val_loss)
+        print(f"Validation Loss: {val_loss:.4f}, Mean IoU: {mean_iou:.4f}")
+
+        scheduler.step(val_loss)
+
         if val_loss < best_loss:
             best_loss = val_loss
-            torch.save(model.state_dict(), os.path.join(CHECKPOINT_DIR, "best_model.pth"))
-            print(">>> Yeni en iyi model kaydedildi! (Dice + BCE Hybrid)")
+            checkpoint = {
+                "epoch": epoch,
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "loss": best_loss,
+                "train_losses": train_losses,
+                "val_losses": val_losses
+            }
+            torch.save(checkpoint, CHECKPOINT_PATH)
+            print(">>> Yeni en iyi model kaydedildi! (Focal + Dice Hybrid)")
+            early_stopping_counter = 0
+        else:
+            early_stopping_counter += 1
+            print(f">>> Early stopping counter: {early_stopping_counter}/{early_stopping_patience}")
+            if early_stopping_counter >= early_stopping_patience:
+                print(">>> Early stopping! Eğitim durduruluyor.")
+                break
+    
+    plt.figure(figsize=(10, 5))
+    plt.plot(train_losses, label="Training Loss")
+    plt.plot(val_losses, label="Validation Loss")
+    plt.title("Training & Validation Loss (Focal + Dice)")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.savefig("loss_graph.png")
+    print(">>> Eğitim tamamlandı ve kayıp grafiği 'loss_graph.png' olarak kaydedildi.")
 
 if __name__ == "__main__":
     main()

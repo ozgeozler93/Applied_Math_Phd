@@ -1,27 +1,8 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
-
-
 from PIL import Image
 import os
 import numpy as np
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-
-
-import os
-import numpy as np
-from PIL import Image
-from torch.utils.data import Dataset
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-
-import torch
-from torch.utils.data import Dataset, DataLoader
-import os
-import numpy as np
-from PIL import Image
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
@@ -47,11 +28,12 @@ class SegmentationDataset(Dataset):
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
                 A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=45, p=0.5),
+                A.GridDistortion(p=0.5),
+                A.ElasticTransform(p=0.5, alpha=120, sigma=120 * 0.05),
+
                 
                 # Renk ve Işık Değişimleri (Farklı gün saatlerini simüle eder)
-                A.RandomBrightnessContrast(p=0.3),
-                A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3),
-                A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.3),
+                A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.5),
                 
                 # Gürültü ve Netlik (Sensör hatalarını simüle eder)
                 A.GaussNoise(p=0.2),
@@ -84,42 +66,49 @@ class SegmentationDataset(Dataset):
         return augmented["image"], augmented["mask"]
 
 if __name__ == '__main__':
-    # This block is for testing the dataset class.
-    # It will only run when you execute this script directly.
-
-    # Define transformations for images and masks separately
-    image_transforms = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    # Bu blok, dataset sınıfını test etmek içindir.
+    # Yalnızca bu betiği doğrudan çalıştırdığınızda çalışır.
     
-    mask_transforms = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor()
-    ])
-
-    # Create an instance of the dataset
+    IMAGE_HEIGHT = 256
+    IMAGE_WIDTH = 256
+    
+    print("Dataset sınıfı test ediliyor...")
+    
     try:
-        segmentation_dataset = SegmentationDataset(
+        # Eğitim veri seti için (augmentation ile)
+        train_dataset = SegmentationDataset(
             image_dir='images',
             mask_dir='labels',
-            transform=image_transforms,
-            target_transform=mask_transforms
+            height=IMAGE_HEIGHT,
+            width=IMAGE_WIDTH,
+            is_train=True
+        )
+        
+        # Test veri seti için (augmentation olmadan)
+        test_dataset = SegmentationDataset(
+            image_dir='images',
+            mask_dir='labels',
+            height=IMAGE_HEIGHT,
+            width=IMAGE_WIDTH,
+            is_train=False
         )
 
-        # Create a DataLoader
-        dataloader = DataLoader(segmentation_dataset, batch_size=4, shuffle=True, num_workers=0)
-
-        # Iterate through the DataLoader to see a batch of data
-        for images, masks in dataloader:
-            print(f"Images batch shape: {images.shape}")
-            print(f"Masks batch shape: {masks.shape}")
-            # The mask should now have 1 channel and values between 0 and 1.
-            print(f"Unique mask values in the first mask of the batch: {torch.unique(masks[0])}")
-            break # We only inspect the first batch
+        print(f"Toplam {len(train_dataset)} adet eğitim verisi bulundu.")
+        
+        # DataLoader oluştur
+        train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+        
+        # DataLoader'dan bir batch veri alıp kontrol et
+        images, masks = next(iter(train_loader))
+        
+        print(f"Images batch shape: {images.shape}") # Beklenen: [batch_size, 3, height, width]
+        print(f"Masks batch shape: {masks.shape}")   # Beklenen: [batch_size, height, width]
+        
+        # Maske değerlerinin 0 ile 1 arasında olduğunu kontrol et
+        print(f"İlk maskenin içindeki benzersiz değerler: {torch.unique(masks[0])}")
+        print("Dataset testi başarılı!")
 
     except FileNotFoundError:
-        print("Please make sure the 'images' and 'labels' directories exist in your project folder.")
-    except ValueError as e:
-        print(e)
+        print("HATA: 'images' ve 'labels' klasörlerinin proje dizininde olduğundan emin olun.")
+    except Exception as e:
+        print(f"Bir hata oluştu: {e}")
