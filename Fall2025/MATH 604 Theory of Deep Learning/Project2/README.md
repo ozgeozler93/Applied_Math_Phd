@@ -56,7 +56,30 @@ $$\alpha = \sigma( \psi^T ( \text{ReLU}( W_x x + W_g g + b ) ) )$$
 * **Final Step ($x_{out} = x \cdot \alpha$):** We multiply the original detail by the attention score. Only the "useful" parts survive.
 
 
-! Without Attention Gates, the model often confuses rooftops with bright roads or concrete pavements. By using AGs, we significantly reduced **False Positives**, leading to the cleaner masks seen in our Performance Analysis.
+!! Without Attention Gates, the model often confuses rooftops with bright roads or concrete pavements. By using AGs, we significantly reduced **False Positives**, leading to the cleaner masks seen in our Performance Analysis.
+
+##  Data Engineering & Pre-processing
+
+Before the training phase, a rigorous pre-processing pipeline was established to ensure data integrity and model convergence.
+
+### 1. Image-Label Alignment (Data Pairing)
+A critical step was ensuring a 1:1 correspondence between the `images/` and `labels/` directories. Since raw satellite datasets can contain mismatched filenames or stray files, a custom sorting and filtering script was implemented:
+* **Filename Synchronization:** All pairs were verified to ensure that `images/building_01.png` exactly matched `labels/building_01.png`. 
+* **Dimensionality Check:** Verified that both the input image and its corresponding mask shared the same spatial dimensions before being fed into the network.
+
+
+### 2. Label Normalization & Binarization
+Satellite masks often come in various formats (grayscale, RGB, or indexed). To make them suitable for the Attention U-Net:
+* **Thresholding:** Grayscale masks were converted to binary format ($0$ for background, $1$ for building).
+* **Normalization:** Pixel values were scaled to a $[0, 1]$ range. This ensures the Binary Cross Entropy and Dice Loss functions operate on consistent probability distributions.
+
+### 3. Contrast Enhancement (CLAHE)
+Satellite imagery frequently suffers from poor contrast due to atmospheric conditions. To highlight building edges:
+* **CLAHE (Contrast Limited Adaptive Histogram Equalization):** This was applied to both training and test sets. It prevents the model from being "blinded" by shadows or over-exposed rooftops by locally enhancing contrast.
+
+### 4. Strategic Data Partitioning
+To prevent **Data Leakage** (a common pitfall where the model "sees" the test data during training), a separate `to-test/` directory was created. This folder was completely isolated from the `random_split` logic, providing an unbiased benchmark for the final PhD performance report.
+
 
 
 ## Performance Metrics: IoU and Dice Coefficient
