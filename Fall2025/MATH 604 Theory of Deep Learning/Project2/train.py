@@ -46,7 +46,8 @@ def evaluate_model(loader, model, focal_fn, dice_fn, device):
         for x, y in loader:
             x, y = x.to(device), y.to(device).unsqueeze(1)
             preds = model(x)
-            val_loss += (0.5 * focal_fn(preds, y) + 0.5 * dice_fn(preds, y)).item()
+            # val_loss += (0.5 * focal_fn(preds, y) + 0.5 * dice_fn(preds, y)).item()
+            val_loss += (0.3 * focal_fn(preds, y) + 0.7 * dice_fn(preds, y)).item()
             preds_binary = (torch.sigmoid(preds) > 0.5).float()
             intersection = (preds_binary * y).sum(dim=(1, 2, 3))
             union = preds_binary.sum(dim=(1, 2, 3)) + y.sum(dim=(1, 2, 3)) - intersection
@@ -82,7 +83,8 @@ def main():
                 for pg in optimizer.param_groups: pg['lr'] = LEARNING_RATE * (epoch / 5)
             
             preds = model(data)
-            loss = 0.5 * focal_fn(preds, targets) + 0.5 * dice_fn(preds, targets)
+            # loss = 0.5 * focal_fn(preds, targets) + 0.5 * dice_fn(preds, targets)
+            loss = (0.3 * focal_fn(preds, targets)) + (0.7 * dice_fn(preds, targets))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
