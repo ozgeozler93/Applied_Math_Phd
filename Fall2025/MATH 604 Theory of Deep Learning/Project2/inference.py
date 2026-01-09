@@ -20,10 +20,10 @@ def run_inference():
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    IMG_DIR, LABEL_DIR, OUT_DIR = "images", "labels", "inference_results"
+    IMG_DIR, LABEL_DIR, OUT_DIR = "to-test", "labels", "inference_results"
     os.makedirs(OUT_DIR, exist_ok=True)
     
-    test_images = [f for f in os.listdir(IMG_DIR) if f.endswith('.png')][:15]
+    test_images = [f for f in os.listdir(IMG_DIR) if f.endswith('.png')]
     iou_list = []
 
     for img_name in test_images:
@@ -61,8 +61,9 @@ def run_inference():
             iou_list.append(iou)
             print(f"{img_name} IoU: {iou:.4f}")
 
-        cv2.imwrite(os.path.join(OUT_DIR, f"pred_{img_name}"), mask * 255)
-
+        cv2.imwrite(os.path.join(OUT_DIR, f"{img_name.split('.')[0]}_segmented.png"), mask * 255)
+        print(f"{img_name} başarıyla segment edildi.")
+        
     print(f"\n--- YENİ MEAN IoU (TTA + Morph): {np.mean(iou_list):.4f} ---")
 
 if __name__ == "__main__":
