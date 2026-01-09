@@ -30,7 +30,36 @@ $$
 * **Advanced Augmentation:** Used `Albumentations` for CLAHE (contrast enhancement), GridDistortion, and ShiftScaleRotate to simulate diverse lighting conditions.
 
 
-## 📏 Performance Metrics: IoU and Dice Coefficient
+
+### 4. Attention Gate Mechanism
+
+If a standard U-Net is like looking at a satellite map in the dark, the **Attention Gate (AG)** is like having a smart flashlight that only shines on the buildings.
+
+### a. What is an Attention Gate? 
+In satellite images, there is a lot of "noise": trees, roads, shadows, and fields. A regular model tries to look at everything at once. The **Attention Gate** acts as a filter. It takes the high-level summary from the deeper layers and says: *"Hey, focus on this area; it looks like a building, and ignore that forest over there."*
+
+### b. How it Works 
+The gate takes two inputs:
+1.  **Skip Connection ($x$):** Detailed information (edges, colors).
+2.  **Gating Signal ($g$):** Contextual information (where the objects are).
+
+The gate multiplies these. If the context ($g$) says an area is irrelevant, the gate "multiplies by zero," effectively silencing that part of the image. If it's a building, it "multiplies by one," letting the detail pass through.
+
+
+### c. The Mathematics
+The attention coefficient ($\alpha$) is calculated as follows:
+
+$$\alpha = \sigma( \psi^T ( \text{ReLU}( W_x x + W_g g + b ) ) )$$
+
+* **$W_x$ and $W_g$:** The model learns which features are important.
+* **ReLU & $\sigma$ (Sigmoid):** These act as on/off switches. Sigmoid ensures the result is between 0 and 1 (0% attention to 100% attention).
+* **Final Step ($x_{out} = x \cdot \alpha$):** We multiply the original detail by the attention score. Only the "useful" parts survive.
+
+
+! Without Attention Gates, the model often confuses rooftops with bright roads or concrete pavements. By using AGs, we significantly reduced **False Positives**, leading to the cleaner masks seen in our Performance Analysis.
+
+
+## Performance Metrics: IoU and Dice Coefficient
 
 In semantic segmentation, evaluating pixel-wise accuracy is insufficient due to class imbalance. Therefore, we utilize the **Intersection over Union (IoU)**, also known as the **Jaccard Index**, as our primary evaluation metric.
 
@@ -82,7 +111,7 @@ While the model generalizes well, certain challenges remain:
 
 
 
-## 🛠 Project Structure
+## Project Structure
 * `model.py`: Attention U-Net implementation with Gating mechanisms.
 * `dataset.py`: Data pipeline featuring CLAHE and spatial augmentations.
 * `train.py`: Training script with Linear Warmup and Cosine Annealing.
@@ -90,7 +119,7 @@ While the model generalizes well, certain challenges remain:
 
 ---
 
-## 🚀 How to Run
+## How to Run
 1. Clone the repository: 
    ```bash
    git clone [https://github.com/ozgeozler93/Applied_Math_Phd.git](https://github.com/ozgeozler93/Applied_Math_Phd.git)
