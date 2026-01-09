@@ -54,7 +54,7 @@ The model is trained on a custom dataset consisting of images and their correspo
 - **Images:** The input images are located in the `images/` directory.
 - **Labels:** The ground truth segmentation masks are in the `labels/` directory.
 
-The `dataset.py` script contains a custom `SegmentationDataset` class that handles loading and preprocessing of the data. This includes resizing images and masks to a uniform size and applying necessary transformations.
+The `dataset.py` script contains a custom `SegmentationDataset` class that handles loading and preprocessing of the data. For training, it applies various data augmentation techniques (e.g., horizontal/vertical flips, rotations, brightness/contrast adjustments) to increase data diversity and improve model generalization. This also includes resizing images and masks to a uniform size and applying necessary transformations.
 
 ---
 
@@ -91,11 +91,12 @@ The following hyperparameters and settings can be configured in `train.py`:
 
 The training loop iterates over the dataset for the specified number of epochs. For each batch, the model performs a forward pass, calculates the loss, and updates the weights through backpropagation.
 
-- **Loss Function:** `BCEWithLogitsLoss` is used, which combines a Sigmoid layer and the Binary Cross Entropy loss in one single class. This is suitable for binary segmentation tasks.
-- **Optimizer:** The `Adam` optimizer is used for its efficiency and adaptive learning rate capabilities.
+- **Loss Function:** A hybrid loss function combining `FocalLoss` and `DiceLoss` is utilized. This combination is particularly effective for imbalanced segmentation tasks, where `FocalLoss` addresses class imbalance by down-weighting easy examples and `DiceLoss` directly optimizes the F1-score-like metric common in segmentation.
+- **Optimizer:** The `Adam` optimizer is used for its efficiency and adaptive learning rate capabilities, coupled with a `CosineAnnealingWarmRestarts` scheduler for dynamic learning rate adjustments.
+- **Validation Loop:** A dedicated validation loop runs after each epoch to monitor model performance on a hold-out set. During this loop, both the validation loss and the Mean Intersection over Union (IoU) metric are calculated to assess segmentation quality and prevent overfitting.
 - **Mixed Precision Training:** The script supports mixed-precision training on CUDA-enabled GPUs, which can accelerate training and reduce memory consumption.
 
-Model checkpoints are saved to the `checkpoints/` directory after each epoch.
+Model checkpoints are saved to the `checkpoints/` directory after each epoch. An early stopping mechanism is also implemented based on the validation loss to halt training if no improvement is observed over a specified number of epochs.
 
 ---
 
@@ -124,14 +125,9 @@ The model was evaluated on a held-out test set using the Intersection over Union
 
 ## 7. Results & Discussion
 
-The model's performance can be evaluated by visually inspecting the generated masks and comparing them to the ground truth. For a quantitative analysis, metrics such as the Dice coefficient or Intersection over Union (IoU) could be implemented in the validation step.
+The model's performance can be evaluated by visually inspecting the generated masks and comparing them to the ground truth. For a quantitative analysis, the Mean Intersection over Union (IoU) metric is calculated during the validation step to monitor performance and prevent overfitting.
 
 The quality of the segmentation depends on several factors, including the model's capacity, the size and diversity of the training dataset, and the choice of hyperparameters.
-
-Potential improvements for this project include:
-- Implementing a validation loop to monitor performance on a hold-out set and prevent overfitting.
-- Experimenting with different loss functions, such as the Dice loss, which is often used for segmentation tasks.
-- Applying data augmentation techniques to increase the diversity of the training data and improve model generalization.
 
 ---
 

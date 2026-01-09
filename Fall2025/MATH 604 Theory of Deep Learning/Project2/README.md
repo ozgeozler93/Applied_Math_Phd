@@ -4,9 +4,9 @@ This repository contains the final project for the **Theory of Deep Learning** c
 ## 🏗️ Model Performance Analysis
 The model successfully identifies building footprints using a custom U-Net architecture. Below is a comparison between the original satellite image, the ground truth label, and our model's prediction.
 
-| Satellite Image | Ground Truth (Label) | Model Prediction (0.8 Threshold) |
+| Satellite Image | Ground Truth (Label) | Model Prediction ( With UNet model) |
 | :---: | :---: | :---: |
-| ![Original](images/121.png) | ![Label](labels/121.png) | ![Prediction](inference_results/535_0.8_segmented.png) |
+| ![Original](images/121.png) | ![Label](labels/121.png) | ![Prediction](inference_results/121_segmented.png) |
 
 
 ## 📊 Model Inference Results

@@ -12,17 +12,17 @@ import matplotlib.pyplot as plt
 from dataset import SegmentationDataset
 from model import AttentionUNet
 
-# --- Ayarlar ---
-DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
-LEARNING_RATE = 5e-5 # Attention U-Net için biraz daha düşük bir LR daha stabil olabilir
+# --- Gelişmiş Hiperparametreler ---
+DEVICE = "cuda" if torch.backends.mps.is_available() else "cpu"
+LEARNING_RATE = 1e-4  # Biraz daha yüksek başladık, Warmup ile dengeleyeceğiz
 BATCH_SIZE = 4
 NUM_EPOCHS = 100
-IMAGE_SIZE = 256
+IMAGE_SIZE = 512
 CHECKPOINT_DIR = "checkpoints"
 CHECKPOINT_PATH = os.path.join(CHECKPOINT_DIR, "best_model.pth")
 
 class DiceLoss(nn.Module):
-    def __init__(self, smooth=1e-6):
+    def __init__(self, smooth=1.0): # Smooth değerini artırdık
         super(DiceLoss, self).__init__()
         self.smooth = smooth
 
@@ -45,13 +45,7 @@ class FocalLoss(nn.Module):
         BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
         pt = torch.exp(-BCE_loss)
         F_loss = self.alpha * (1 - pt)**self.gamma * BCE_loss
-        
-        if self.reduction == 'mean':
-            return torch.mean(F_loss)
-        elif self.reduction == 'sum':
-            return torch.sum(F_loss)
-        else:
-            return F_loss
+        return torch.mean(F_loss) if self.reduction == 'mean' else torch.sum(F_loss)
 
 def evaluate_model(loader, model, focal_fn, dice_fn, device):
     model.eval()
@@ -62,33 +56,25 @@ def evaluate_model(loader, model, focal_fn, dice_fn, device):
         for x, y in loader:
             x, y = x.to(device), y.to(device).unsqueeze(1)
             preds = model(x)
-
-            loss_focal = focal_fn(preds, y)
-            loss_dice = dice_fn(preds, y)
-            loss = (0.5 * loss_focal) + (0.5 * loss_dice)
+            # Eval sırasında da aynı ağırlıklı loss
+            loss = (0.7 * focal_fn(preds, y)) + (0.3 * dice_fn(preds, y))
             val_loss += loss.item()
             
-            preds_prob = torch.sigmoid(preds)
-            preds_binary = (preds_prob > 0.5).float()
-            
+            preds_binary = (torch.sigmoid(preds) > 0.5).float()
             intersection = (preds_binary * y).sum(dim=(1, 2, 3))
             union = preds_binary.sum(dim=(1, 2, 3)) + y.sum(dim=(1, 2, 3)) - intersection
-            iou = (intersection + 1e-6) / (union + 1e-6)
-            
-            total_iou += iou.sum().item()
+            total_iou += ((intersection + 1e-6) / (union + 1e-6)).sum().item()
             num_samples += y.size(0)
             
     model.train()
-    avg_loss = val_loss / len(loader)
-    mean_iou = total_iou / num_samples
-    return avg_loss, mean_iou
+    return val_loss / len(loader), total_iou / num_samples
 
 def main():
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
-    print(f"Eğitim başlıyor... Cihaz: {DEVICE}")
+    print(f"Gelişmiş Eğitim Başlıyor... Cihaz: {DEVICE}")
 
     full_dataset = SegmentationDataset("images", "labels", IMAGE_SIZE, IMAGE_SIZE, is_train=True)
-    train_size = int(0.9 * len(full_dataset))
+    train_size = int(0.85 * len(full_dataset)) # Val setini biraz büyüttük daha güvenilir skor için
     val_size = len(full_dataset) - train_size
     train_set, val_set = random_split(full_dataset, [train_size, val_size])
 
@@ -97,79 +83,69 @@ def main():
 
     model = AttentionUNet(in_channels=3, out_channels=1).to(DEVICE)
     
-    # Yeni Hibrit Kayıp Fonksiyonları: Focal + Dice
-    focal_fn = FocalLoss(alpha=0.25, gamma=2.5)
+    # Agresif Loss Ağırlıkları
+    focal_fn = FocalLoss(alpha=0.8, gamma=2.0) 
     dice_fn = DiceLoss()
 
-    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2, eta_min=1e-6)
+    optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4) # AdamW daha iyi regülasyon sağlar
+    
+    # Cosine Annealing ile kademeli düşüş
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS)
 
-    start_epoch = 1
-    best_loss = float("inf")
+    best_iou = 0.0
     train_losses, val_losses = [], []
-    early_stopping_patience = 10
-    early_stopping_counter = 0
+    patience = 15 # Early stopping süresini biraz uzattık
+    counter = 0
 
-
-
-    for epoch in range(start_epoch, NUM_EPOCHS + 1):
+    for epoch in range(1, NUM_EPOCHS + 1):
         model.train()
-        loop = tqdm(train_loader, desc=f"Epoch {epoch}/{NUM_EPOCHS}")
         epoch_loss = 0
+        loop = tqdm(train_loader, desc=f"Epoch {epoch}/{NUM_EPOCHS}")
 
-        for batch_idx, (data, targets) in enumerate(loop):
+        for data, targets in loop:
             data, targets = data.to(DEVICE), targets.to(DEVICE).unsqueeze(1)
-            predictions = model(data)
+            
+            # Linear Warmup (İlk 5 epoch)
+            if epoch <= 5:
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = LEARNING_RATE * (epoch / 5)
 
-            loss_focal = focal_fn(predictions, targets)
-            loss_dice = dice_fn(predictions, targets)
-            loss = (0.5 * loss_focal) + (0.5 * loss_dice)
+            preds = model(data)
+            loss = (0.7 * focal_fn(preds, targets)) + (0.3 * dice_fn(preds, targets))
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             epoch_loss += loss.item()
-            loop.set_postfix(loss=loss.item())
+            loop.set_postfix(loss=loss.item(), lr=optimizer.param_groups[0]['lr'])
 
-        avg_epoch_loss = epoch_loss / len(train_loader)
-        train_losses.append(avg_epoch_loss)
-
+        avg_train_loss = epoch_loss / len(train_loader)
         val_loss, mean_iou = evaluate_model(val_loader, model, focal_fn, dice_fn, DEVICE)
+        
+        train_losses.append(avg_train_loss)
         val_losses.append(val_loss)
-        print(f"Validation Loss: {val_loss:.4f}, Mean IoU: {mean_iou:.4f}")
+        
+        print(f"Epoch {epoch} -> Val Loss: {val_loss:.4f}, Mean IoU: {mean_iou:.4f}")
 
         scheduler.step()
 
-        if val_loss < best_loss:
-            best_loss = val_loss
-            checkpoint = {
-                "epoch": epoch,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "loss": best_loss,
-                "train_losses": train_losses,
-                "val_losses": val_losses
-            }
-            torch.save(checkpoint, CHECKPOINT_PATH)
-            print(">>> Yeni en iyi model kaydedildi! (Focal + Dice Hybrid)")
-            early_stopping_counter = 0
+        # En iyi IoU'ya göre kaydetmek segmentasyonda daha mantıklıdır
+        if mean_iou > best_iou:
+            best_iou = mean_iou
+            torch.save({"model_state_dict": model.state_dict()}, CHECKPOINT_PATH)
+            print(f">>> Yeni En İyi Model Kaydedildi! IoU: {best_iou:.4f}")
+            counter = 0
         else:
-            early_stopping_counter += 1
-            print(f">>> Early stopping counter: {early_stopping_counter}/{early_stopping_patience}")
-            if early_stopping_counter >= early_stopping_patience:
-                print(">>> Early stopping! Eğitim durduruluyor.")
+            counter += 1
+            if counter >= patience:
+                print("Early Stopping Tetiklendi.")
                 break
     
-    plt.figure(figsize=(10, 5))
-    plt.plot(train_losses, label="Training Loss")
-    plt.plot(val_losses, label="Validation Loss")
-    plt.title("Training & Validation Loss (Focal + Dice)")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.legend()
-    plt.savefig("loss_graph.png")
-    print(">>> Eğitim tamamlandı ve kayıp grafiği 'loss_graph.png' olarak kaydedildi.")
+    # Grafik Çizimi
+    plt.plot(train_losses, label="Train Loss")
+    plt.plot(val_losses, label="Val Loss")
+    plt.legend(); plt.savefig("loss_graph.png")
 
 if __name__ == "__main__":
     main()
