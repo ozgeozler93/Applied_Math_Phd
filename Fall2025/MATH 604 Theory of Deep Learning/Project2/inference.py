@@ -42,7 +42,7 @@ def run_inference():
             final_prob = (out1 + out2) / 2
         
         # Eşikleme ve Temizlik
-        mask = (final_prob.squeeze().cpu().numpy() > 0.50).astype(np.uint8)
+        mask = (final_prob.squeeze().cpu().numpy() > 0.60).astype(np.uint8)
         kernel = np.ones((3,3), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 

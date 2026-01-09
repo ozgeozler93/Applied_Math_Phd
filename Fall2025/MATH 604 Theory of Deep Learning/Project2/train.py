@@ -47,7 +47,7 @@ def evaluate_model(loader, model, focal_fn, dice_fn, device):
             x, y = x.to(device), y.to(device).unsqueeze(1)
             preds = model(x)
             # val_loss += (0.5 * focal_fn(preds, y) + 0.5 * dice_fn(preds, y)).item()
-            val_loss += (0.3 * focal_fn(preds, y) + 0.7 * dice_fn(preds, y)).item()
+            val_loss += (0.7 * focal_fn(preds, y) + 0.3 * dice_fn(preds, y)).item()
             preds_binary = (torch.sigmoid(preds) > 0.5).float()
             intersection = (preds_binary * y).sum(dim=(1, 2, 3))
             union = preds_binary.sum(dim=(1, 2, 3)) + y.sum(dim=(1, 2, 3)) - intersection
@@ -57,6 +57,12 @@ def evaluate_model(loader, model, focal_fn, dice_fn, device):
     return val_loss / len(loader), total_iou / num_samples
 
 def main():
+    torch.manual_seed(42)
+    torch.cuda.manual_seed(42)  # GPU için
+    import random
+    random.seed(42)
+    import numpy as np
+    np.random.seed(42)
     os.makedirs("checkpoints", exist_ok=True)
     full_dataset = SegmentationDataset("images", "labels", IMAGE_SIZE, IMAGE_SIZE, is_train=True)
     train_size = int(0.85 * len(full_dataset))
@@ -84,14 +90,21 @@ def main():
             
             preds = model(data)
             # loss = 0.5 * focal_fn(preds, targets) + 0.5 * dice_fn(preds, targets)
-            loss = (0.3 * focal_fn(preds, targets)) + (0.7 * dice_fn(preds, targets))
+            loss = (0.7 * focal_fn(preds, targets)) + (0.3 * dice_fn(preds, targets))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
         
+        avg_train_loss = epoch_loss / len(train_loader)
         avg_v_loss, mean_iou = evaluate_model(val_loader, model, focal_fn, dice_fn, DEVICE)
-        print(f"Val IoU: {mean_iou:.4f}")
+
+        # Loss tracking
+        train_losses.append(avg_train_loss)
+        val_losses.append(avg_v_loss)
+        
+        print(f"Epoch {epoch}: Train Loss={avg_train_loss:.4f}, Val Loss={avg_v_loss:.4f}, Val IoU={mean_iou:.4f}")
+        # print(f"Val IoU: {mean_iou:.4f}")
         scheduler.step()
 
         if mean_iou > best_iou:
@@ -101,6 +114,21 @@ def main():
         else:
             counter += 1
             if counter >= patience: break
+
+
+    # Training bitince grafik çiz
+    plt.figure(figsize=(10, 6))
+    plt.plot(train_losses, label='Training Loss')
+    plt.plot(val_losses, label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Training & Validation Loss (Focal + Dice)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig('loss_graph.png', dpi=150)
+    plt.close()
+    print(f"\nGrafik kaydedildi: loss_graph.png")
+    print(f"Best IoU: {best_iou:.4f}")
 
 if __name__ == "__main__":
     main()

@@ -20,10 +20,10 @@ A hybrid loss function was designed to balance pixel-wise accuracy with structur
 This combination ensures the model learns both the distribution of pixels and the geometric structure of buildings:
 
 $$
-\mathcal{L}_{Hybrid} = \underbrace{0.3 \cdot \mathcal{L}_{Focal}}_{\text{Pixel-wise Imbalance}} + \underbrace{0.7 \cdot \mathcal{L}_{Dice}}_{\text{Structural Integrity}}
+\mathcal{L}_{Hybrid} = \underbrace{0.7 \cdot \mathcal{L}_{Focal}}_{\text{Pixel-wise Imbalance}} + \underbrace{0.3 \cdot \mathcal{L}_{Dice}}_{\text{Structural Integrity}}
 $$
 
-**Why 0.7 Dice?** Satellite imagery contains sparse building masks. By weighting the **Dice Loss** at 70%, the optimization process prioritizes the **overlap area** over individual pixel accuracy, leading to the sharp, non-blurry boundaries observed in the results.
+**Why 0.7 Focal?** Satellite imagery contains sparse building masks. By weighting the **Dice Loss** at 70%, the optimization process prioritizes the **overlap area** over individual pixel accuracy, leading to the sharp, non-blurry boundaries observed in the results.
 
 
 
@@ -118,14 +118,16 @@ This section analyzes the qualitative and quantitative performance of the model 
 
 By shifting to a **Dice-dominant Hybrid Loss** and implementing **Test Time Augmentation (TTA)**, we observed a significant reduction in segmentation noise and an increase in boundary sharpness.
 
-| Sample ID | Original Image | Predicted Mask | Success Metrics | Analysis |
-| :--- | :---: | :---: | :---: | :--- |
-| **Img 535** | <img src="to-test/535.png" width="200"> | <img src="inference_results/pred_535.png" width="200"> | **IoU:** ~0.65<br>**Dice:** ~0.78 | **Success:** Robust performance in high-density urban layouts. Effectively distinguished separate building blocks despite their close proximity. |
-| **Img 537** | <img src="to-test/537.png" width="200"> | <img src="inference_results/pred_537.png" width="200"> | **IoU:** ~0.72<br>**Dice:** ~0.84 | **Success:** Clear separation between adjacent buildings. Attention gates successfully ignored the surrounding vegetation. |
-| **Img 539** | <img src="to-test/539.png" width="200"> | <img src="inference_results/pred_539.png" width="200"> | **IoU:** ~0.60<br>**Dice:** ~0.75 | **Success:** Solid object detection. Geometric consistency improved significantly with Dice-heavy training. |
-| **Img 551** | <img src="to-test/551.png" width="200"> | <img src="inference_results/pred_551.png" width="200"> | **IoU:** ~0.70<br>**Dice:** ~0.82 | **Success:** Sharp rectangular boundaries. The model effectively identified building footprints despite shadows. |
-| **Img 553** | <img src="to-test/553.png" width="200"> | <img src="inference_results/pred_553.png" width="200"> | **IoU:** ~0.55<br>**Dice:** ~0.71 | **Success:** Demonstrated strong generalization on low-contrast targets and dark-roofed structures obscured by shadows. |
 
+**Quantitative Results:** On the training/validation set, the model achieved a **Mean IoU of 0.7738** with optimal threshold of 0.6.
+
+| Sample ID | Original Image | Predicted Mask | Analysis |
+| :--- | :---: | :---: | :--- |
+| **Img 535** | <img src="to-test/535.png" width="200"> | <img src="inference_results/pred_535.png" width="200"> | Robust performance in high-density urban layouts. Effectively distinguished separate building blocks despite their close proximity. |
+| **Img 537** | <img src="to-test/537.png" width="200"> | <img src="inference_results/pred_537.png" width="200"> | Clear separation between adjacent buildings. Attention gates successfully ignored the surrounding vegetation. |
+| **Img 539** | <img src="to-test/539.png" width="200"> | <img src="inference_results/pred_539.png" width="200"> | Solid object detection. Geometric consistency improved significantly with Dice-heavy training. |
+| **Img 551** | <img src="to-test/551.png" width="200"> | <img src="inference_results/pred_551.png" width="200"> | Sharp rectangular boundaries. The model effectively identified building footprints despite shadows. |
+| **Img 553** | <img src="to-test/553.png" width="200"> | <img src="inference_results/pred_553.png" width="200"> | Demonstrated strong generalization on low-contrast targets and dark-roofed structures obscured by shadows. |
 
 
 
@@ -158,11 +160,10 @@ I implemented a dedicated tuning script (`threshold_tuning.py`) to systematicall
 
 | Threshold | Mean IoU | Observation |
 | :--- | :--- | :--- |
-| 0.3 | 0.42 | High Recall, but many False Positives (Noisy boundaries). |
-| **0.5** | **0.5793** | **Optimal Threshold.** Balanced performance. |
-| 0.8 | 0.54 | High Precision, but many False Negatives (Missed small buildings). |
-
-
+| 0.3 | 0.5943 | High Recall, but many False Positives (Noisy boundaries). |
+| 0.5 | 0.7547 | Balanced performance. |
+| **0.6** | **0.7738** | **Optimal Threshold.** Best IoU achieved. |
+| 0.8 | 0.7319 | High Precision, but many False Negatives (Missed small buildings). |
 
 By using this empirical approach, I ensured that the final `inference_results` are produced using the mathematically optimal threshold for this specific dataset.
 ---
@@ -175,10 +176,14 @@ By using this empirical approach, I ensured that the final `inference_results` a
 
 2. Install dependencies:
    ```bash
-   !pip install torch albumentations opencv-python Pillow
+   !pip install torch albumentations opencv-python Pillow matplotlib tqdm
    ```
    
 3. Run inference on test data:
    ```bash
    python inference.py
+   ```
+4. (Optional) Run threshold tuning:
+   ```bash
+   python threshold_tuning.py
    ```
