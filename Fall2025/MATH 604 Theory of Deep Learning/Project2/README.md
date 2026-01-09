@@ -23,6 +23,31 @@ $$Loss = 0.3 \cdot \mathcal{L}_{Focal} + 0.7 \cdot \mathcal{L}_{Dice}$$
 * **Advanced Augmentation:** Used `Albumentations` for CLAHE (contrast enhancement), GridDistortion, and ShiftScaleRotate to simulate diverse lighting conditions.
 
 
+## 📏 Performance Metrics: IoU and Dice Coefficient
+
+In semantic segmentation, evaluating pixel-wise accuracy is insufficient due to class imbalance. Therefore, we utilize the **Intersection over Union (IoU)**, also known as the **Jaccard Index**, as our primary evaluation metric.
+
+
+
+### 1. Intersection over Union (IoU)
+IoU measures the overlap between the predicted segmentation mask ($A$) and the ground truth mask ($B$):
+
+$$IoU(A, B) = \frac{|A \cap B|}{|A \cup B|} = \frac{TP}{TP + FP + FN}$$
+
+Where:
+* **TP (True Positive):** Correctly identified building pixels.
+* **FP (False Positive):** Background pixels incorrectly identified as buildings.
+* **FN (False Negative):** Building pixels missed by the model.
+
+### 2. Dice Coefficient (F1-Score)
+While IoU is used for evaluation, the **Dice Coefficient** is utilized within our loss function because it is differentiable and provides smoother gradients during backpropagation:
+
+$$Dice(A, B) = \frac{2|A \cap B|}{|A| + |B|} = \frac{2TP}{2TP + FP + FN}$$
+
+In this project, optimizing for **0.7 Dice Loss** forced the model to maximize this overlap, directly leading to the sharper boundaries observed in the `to-test` results.
+
+
+
 
 ## 🔍 Model Performance Analysis
 
