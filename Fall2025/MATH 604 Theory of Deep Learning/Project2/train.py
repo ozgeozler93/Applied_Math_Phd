@@ -13,7 +13,12 @@ from dataset import SegmentationDataset
 from model import AttentionUNet
 
 # --- Gelişmiş Hiperparametreler ---
-DEVICE = "cuda" if torch.backends.mps.is_available() else "cpu"
+if torch.cuda.is_available():
+    DEVICE = "cuda"      # Colab veya NVIDIA GPU'lu Windows/Linux
+elif torch.backends.mps.is_available():
+    DEVICE = "mps"       # Senin MacBook Air'in (M serisi işlemci)
+else:
+    DEVICE = "cpu"       # Hiçbiri yoksa en yavaş seçenek
 LEARNING_RATE = 1e-4  # Biraz daha yüksek başladık, Warmup ile dengeleyeceğiz
 BATCH_SIZE = 4
 NUM_EPOCHS = 100
