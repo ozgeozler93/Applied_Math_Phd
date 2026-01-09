@@ -159,8 +159,7 @@ I implemented a dedicated tuning script (`threshold_tuning.py`) to systematicall
 | Threshold | Mean IoU | Observation |
 | :--- | :--- | :--- |
 | 0.3 | 0.42 | High Recall, but many False Positives (Noisy boundaries). |
-| 0.5 | 0.61 | Balanced performance. |
-| **0.65** | **0.68** | **Optimal Threshold.** Maximum geometric precision for building footprints. |
+| **0.5** | **0.5793** | **Optimal Threshold.** Balanced performance. |
 | 0.8 | 0.54 | High Precision, but many False Negatives (Missed small buildings). |
 
 
