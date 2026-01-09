@@ -63,6 +63,7 @@ While the model generalizes well, certain challenges remain:
    ```bash
    pip install torch albumentations opencv-python Pillow
   ```
+
 3. Run inference on test data:
    ```bash
   python inference.py
