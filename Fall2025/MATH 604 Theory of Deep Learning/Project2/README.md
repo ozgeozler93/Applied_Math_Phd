@@ -17,7 +17,7 @@ A hybrid loss function was designed to balance pixel-wise accuracy with structur
 * **Focal Loss:** Handles the extreme class imbalance by down-weighting easy-to-classify background pixels.
 * **Dice Loss:** Directly optimizes the **Intersection over Union (IoU)**, ensuring that the predicted building shapes are geometrically precise.
 
-To optimize the Attention U-Net, we implemented a strategic hybrid loss function. This combination ensures the model learns both the distribution of pixels and the geometric structure of buildings:
+This combination ensures the model learns both the distribution of pixels and the geometric structure of buildings:
 
 $$
 \mathcal{L}_{Hybrid} = \underbrace{0.3 \cdot \mathcal{L}_{Focal}}_{\text{Pixel-wise Imbalance}} + \underbrace{0.7 \cdot \mathcal{L}_{Dice}}_{\text{Structural Integrity}}
