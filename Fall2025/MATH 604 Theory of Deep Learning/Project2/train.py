@@ -19,9 +19,9 @@ elif torch.backends.mps.is_available():
     DEVICE = "mps"       # Senin MacBook Air'in (M serisi işlemci)
 else:
     DEVICE = "cpu"       # Hiçbiri yoksa en yavaş seçenek
-LEARNING_RATE = 1e-4  # Biraz daha yüksek başladık, Warmup ile dengeleyeceğiz
+LEARNING_RATE = 5e-5  # Biraz daha yüksek başladık, Warmup ile dengeleyeceğiz
 BATCH_SIZE = 4
-NUM_EPOCHS = 100
+NUM_EPOCHS = 150
 IMAGE_SIZE = 512
 CHECKPOINT_DIR = "checkpoints"
 CHECKPOINT_PATH = os.path.join(CHECKPOINT_DIR, "best_model.pth")
@@ -99,7 +99,7 @@ def main():
 
     best_iou = 0.0
     train_losses, val_losses = [], []
-    patience = 15 # Early stopping süresini biraz uzattık
+    patience = 25 # Early stopping süresini biraz uzattık
     counter = 0
 
     for epoch in range(1, NUM_EPOCHS + 1):

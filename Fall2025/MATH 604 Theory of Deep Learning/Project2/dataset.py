@@ -22,15 +22,16 @@ class SegmentationDataset(Dataset):
         
         if is_train:
             # Gelişmiş Augmentation Pipeline
+        # Gelişmiş Augmentation Pipeline
             self.transform = A.Compose([
+                A.Resize(height, width),
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
-                A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=45, p=0.5),
-                A.CLAHE(p=0.5),
-                A.GaussNoise(p=0.2),
-                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
-                *norm_transform
+                A.CLAHE(clip_limit=4.0, p=0.7), # Kontrast artırıldı
+                A.ColorJitter(brightness=0.2, contrast=0.2, p=0.4),
+                A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                ToTensorV2(),
             ])
         else:
             self.transform = A.Compose(norm_transform)
