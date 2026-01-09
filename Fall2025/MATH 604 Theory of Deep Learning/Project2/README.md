@@ -25,6 +25,8 @@ $$
 
 **Why 0.7 Dice?** Satellite imagery contains sparse building masks. By weighting the **Dice Loss** at 70%, the optimization process prioritizes the **overlap area** over individual pixel accuracy, leading to the sharp, non-blurry boundaries observed in the results.
 
+
+
 ### 3. Training & Generalization
 * **Honest Evaluation:** The dataset was strictly partitioned. The `to-test` directory contains images that the model **never saw** during training, ensuring a true measure of generalization.
 * **Advanced Augmentation:** Used `Albumentations` for CLAHE (contrast enhancement), GridDistortion, and ShiftScaleRotate to simulate diverse lighting conditions.
@@ -133,6 +135,12 @@ While the model generalizes well, certain challenges remain:
 * **Spectral Similarity:** Concrete surfaces with similar spectral signatures to rooftops can trigger false positives, mitigated by the 0.7 Dice Loss weight.
 
 
+### 3. Training Dynamics
+The training process was monitored to ensure convergence and prevent overfitting. The hybrid loss function successfully balanced pixel-wise classification with structural integrity.
+
+![Training Loss Graph](loss_graph.png)
+
+*The graph illustrates the decrease in both Focal and Dice loss over 150 epochs. The validation loss remains stable, indicating strong generalization.*
 
 ## Project Structure
 * `model.py`: Attention U-Net implementation with Gating mechanisms.
