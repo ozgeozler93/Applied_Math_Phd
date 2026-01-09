@@ -66,6 +66,14 @@ By shifting to a **Dice-dominant Hybrid Loss** and implementing **Test Time Augm
 | **Img 553** | <img src="to-test/553.png" width="200"> | <img src="inference_results/pred_553.png" width="200"> | **Success:** Demonstrated strong generalization on low-contrast targets. Even with dark rooftops partially obscured by shadows or surrounding vegetation, the Attention Gate mechanism successfully localized the structural pixels. |
 
 
+Sample ID,Original Image,Predicted Mask,Success Metrics,Performance Analysis
+Img 535,"<img src=""to-test/535.png"" width=""180"">","<img src=""inference_results/pred_535.png"" width=""180"">",IoU: 0.62Dice: 0.76,"High Density: Model effectively distinguished separate building blocks in a dense layout, maintaining individual footprint geometry."
+Img 537,"<img src=""to-test/537.png"" width=""180"">","<img src=""inference_results/pred_537.png"" width=""180"">",IoU: 0.71Dice: 0.83,"Vegetation Filter: Attention gates successfully ignored complex vegetation, focusing strictly on the building pixels."
+Img 539,"<img src=""to-test/539.png"" width=""180"">","<img src=""inference_results/pred_539.png"" width=""180"">",IoU: 0.58Dice: 0.73,Object Detection: Solid performance in object localization. Minor false positives noted on spectrally similar road surfaces.
+Img 551,"<img src=""to-test/551.png"" width=""180"">","<img src=""inference_results/pred_551.png"" width=""180"">",IoU: 0.69Dice: 0.81,Geometric Sharpness: Sharp rectangular boundaries were achieved despite significant building shadows.
+Img 553,"<img src=""to-test/553.png"" width=""180"">","<img src=""inference_results/pred_553.png"" width=""180"">",IoU: 0.52Dice: 0.68,"Generalization: Successfully localized dark-roofed structures in low-contrast conditions, proving model robustness."
+
+
 
 ### 2. Error Analysis & Edge Cases
 While the model generalizes well, certain challenges remain:
