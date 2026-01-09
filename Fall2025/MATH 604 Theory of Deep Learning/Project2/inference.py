@@ -6,6 +6,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from PIL import Image
 from model import AttentionUNet
+from dataset import get_validation_transform
 
 if torch.cuda.is_available(): DEVICE = "cuda"
 elif torch.backends.mps.is_available(): DEVICE = "mps"
@@ -17,13 +18,8 @@ def run_inference():
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval()
 
-    # Inference Transform (CLAHE ekli)
-    inf_transform = A.Compose([
-        A.Resize(512, 512),
-        A.CLAHE(clip_limit=4.0, p=1.0),
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(),
-    ])
+    # Inference Transform (imported from dataset.py)
+    inf_transform = get_validation_transform(512, 512)
 
     IMG_DIR, OUT_DIR = "to-test", "inference_results"
     os.makedirs(OUT_DIR, exist_ok=True)

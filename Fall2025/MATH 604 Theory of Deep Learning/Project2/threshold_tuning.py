@@ -10,7 +10,7 @@ from model import AttentionUNet
 DEVICE = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
 MODEL_PATH = "checkpoints/best_model.pth"
 LABEL_DIR = "labels"
-TEST_DIR = "to-test"
+TEST_DIR = "images"
 IMAGE_SIZE = 512
 
 def calculate_iou(pred_mask, true_mask):
