@@ -9,7 +9,7 @@ This project was developed for **MATH 604: Theory of Deep Learning (Fall 2025)**
 To address the challenges of small object detection and background noise in satellite data, the following strategies were implemented:
 
 ### 1. Model Architecture: Attention U-Net
-Standard U-Nets use skip connections that can carry redundant low-level feature information. I integrated **Attention Gates (AGs)** into the skip connections. AGs automatically learn to focus on target structures (buildings) without additional supervision, effectively suppressing irrelevant regions.
+Standard U-Nets use skip connections that can carry redundant low-level feature information. I integrated [Attention Gates (AGs)](#4-attention-gate-mechanism) into the skip connections. AGs automatically learn to focus on target structures (buildings) without additional supervision, effectively suppressing irrelevant regions.
 
 ### 2. Loss Function Optimization
 A hybrid loss function was designed to balance pixel-wise accuracy with structural integrity:
