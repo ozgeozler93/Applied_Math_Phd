@@ -20,16 +20,31 @@ class SegmentationDataset(Dataset):
             ToTensorV2(),
         ]
         
+        # dataset.py içindeki is_train bloğunu bu şekilde güncelle:
         if is_train:
-            # Gelişmiş Augmentation Pipeline
-        # Gelişmiş Augmentation Pipeline
             self.transform = A.Compose([
                 A.Resize(height, width),
+                # Geometrik Dönüşümler (Binaların yönünü ve şeklini değiştirir)
                 A.HorizontalFlip(p=0.5),
                 A.VerticalFlip(p=0.5),
                 A.RandomRotate90(p=0.5),
-                A.CLAHE(clip_limit=4.0, p=0.7), # Kontrast artırıldı
-                A.ColorJitter(brightness=0.2, contrast=0.2, p=0.4),
+                A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=45, p=0.5),
+                A.OneOf([
+                    A.GridDistortion(p=0.5),
+                    A.OpticalDistortion(distort_limit=0.05, shift_limit=0.05, p=0.5),
+                ], p=0.3),
+                
+                # Işık ve Renk Dönüşümleri (Güneş açısı ve gölge etkisini simüle eder)
+                A.CLAHE(clip_limit=4.0, p=0.7),
+                A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.5),
+                A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3),
+                
+                # Gürültü ve Bulanıklık (Hatalı çekimleri simüle eder)
+                A.OneOf([
+                    A.GaussNoise(var_limit=(10.0, 50.0), p=0.5),
+                    A.Blur(blur_limit=3, p=0.5),
+                ], p=0.2),
+
                 A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
                 ToTensorV2(),
             ])
