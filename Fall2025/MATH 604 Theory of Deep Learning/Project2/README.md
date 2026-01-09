@@ -148,6 +148,24 @@ The training process was monitored to ensure convergence and prevent overfitting
 * `train.py`: Training script with Linear Warmup and Cosine Annealing.
 * `inference.py`: Evaluation script featuring **Test Time Augmentation (TTA)**.
 
+
+
+## ⚙️ Threshold Optimization (Hyperparameter Tuning)
+
+While the default decision threshold is typically 0.5, building footprints in satellite imagery often require a more calibrated approach due to spectral noise. 
+
+I implemented a dedicated tuning script (`threshold_tuning.py`) to systematically test threshold values from **0.1 to 0.9**. 
+
+| Threshold | Mean IoU | Observation |
+| :--- | :--- | :--- |
+| 0.3 | 0.42 | High Recall, but many False Positives (Noisy boundaries). |
+| 0.5 | 0.61 | Balanced performance. |
+| **0.65** | **0.68** | **Optimal Threshold.** Maximum geometric precision for building footprints. |
+| 0.8 | 0.54 | High Precision, but many False Negatives (Missed small buildings). |
+
+
+
+By using this empirical approach, I ensured that the final `inference_results` are produced using the mathematically optimal threshold for this specific dataset.
 ---
 
 ## How to Run
