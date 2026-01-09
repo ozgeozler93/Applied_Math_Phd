@@ -59,11 +59,12 @@ By shifting to a **Dice-dominant Hybrid Loss** and implementing **Test Time Augm
 
 | Sample ID | Original Image | Predicted Mask | Analysis |
 | :--- | :---: | :---: | :--- |
-| **Img 535** | <img src="to-test/535.png" width="200"> | <img src="inference_results/pred_535.png" width="200"> | **Success:** ??. |
+| **Img 535** | <img src="to-test/535.png" width="200"> | <img src="inference_results/pred_535.png" width="200"> | **Success:**  Success: Robust performance in high-density urban layouts. The model effectively distinguished separate building blocks despite their close proximity, maintaining individual footprint geometry. |
 | **Img 537** | <img src="to-test/537.png" width="200"> | <img src="inference_results/pred_537.png" width="200"> | **Success:** Clear separation between adjacent buildings. Attention gates successfully ignored the surrounding vegetation. |
 | **Img 539** | <img src="to-test/539.png" width="200"> | <img src="inference_results/pred_539.png" width="200"> | **Success:** Solid object detection. Geometric consistency improved significantly with Dice-heavy training. |
 | **Img 551** | <img src="to-test/551.png" width="200"> | <img src="inference_results/pred_551.png" width="200"> | **Success:** Sharp rectangular boundaries. The model effectively identified building footprints despite shadows. |
-| **Img 553** | <img src="to-test/553.png" width="200"> | <img src="inference_results/pred_553.png" width="200"> | **Success:** ???. |
+| **Img 553** | <img src="to-test/553.png" width="200"> | <img src="inference_results/pred_553.png" width="200"> | **Success:** Demonstrated strong generalization on low-contrast targets. Even with dark rooftops partially obscured by shadows or surrounding vegetation, the Attention Gate mechanism successfully localized the structural pixels. |
+
 
 
 ### 2. Error Analysis & Edge Cases
