@@ -13,7 +13,6 @@ Standard U-Nets use skip connections that can carry redundant low-level feature 
 
 ### 2. Loss Function Optimization
 A hybrid loss function was designed to balance pixel-wise accuracy with structural integrity:
-$$Loss = 0.3 \cdot \mathcal{L}_{Focal} + 0.7 \cdot \mathcal{L}_{Dice}$$
 
 * **Focal Loss:** Handles the extreme class imbalance by down-weighting easy-to-classify background pixels.
 * **Dice Loss:** Directly optimizes the **Intersection over Union (IoU)**, ensuring that the predicted building shapes are geometrically precise.
