@@ -4,7 +4,7 @@ This project was developed for **MATH 604: Theory of Deep Learning (Fall 2025)**
 
 
 
-## 🧠 Theoretical Background & Methodology
+##  Theoretical Background & Methodology
 
 To address the challenges of small object detection and background noise in satellite data, the following strategies were implemented:
 
@@ -17,6 +17,14 @@ $$Loss = 0.3 \cdot \mathcal{L}_{Focal} + 0.7 \cdot \mathcal{L}_{Dice}$$
 
 * **Focal Loss:** Handles the extreme class imbalance by down-weighting easy-to-classify background pixels.
 * **Dice Loss:** Directly optimizes the **Intersection over Union (IoU)**, ensuring that the predicted building shapes are geometrically precise.
+
+To optimize the Attention U-Net, we implemented a strategic hybrid loss function. This combination ensures the model learns both the distribution of pixels and the geometric structure of buildings:
+
+$$
+\mathcal{L}_{Hybrid} = \underbrace{0.3 \cdot \mathcal{L}_{Focal}}_{\text{Pixel-wise Imbalance}} + \underbrace{0.7 \cdot \mathcal{L}_{Dice}}_{\text{Structural Integrity}}
+$$
+
+**Why 0.7 Dice?** Satellite imagery contains sparse building masks. By weighting the **Dice Loss** at 70%, the optimization process prioritizes the **overlap area** over individual pixel accuracy, leading to the sharp, non-blurry boundaries observed in the results.
 
 ### 3. Training & Generalization
 * **Honest Evaluation:** The dataset was strictly partitioned. The `to-test` directory contains images that the model **never saw** during training, ensuring a true measure of generalization.
