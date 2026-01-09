@@ -67,5 +67,5 @@ While the model generalizes well, certain challenges remain:
 3. Run inference on test data:
    ```bash
   python inference.py
-   ```
+  ```
   
