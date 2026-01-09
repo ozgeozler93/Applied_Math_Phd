@@ -61,10 +61,9 @@ While the model generalizes well, certain challenges remain:
 
 2. Install dependencies:
    ```bash
-   pip install torch albumentations opencv-python Pillow
+   !pip install torch albumentations opencv-python Pillow
   ```
-
-2. Install dependencies:
+3. Run inference on test data:
    ```bash
-   pip install torch albumentations opencv-python Pillow
+   ffffffff
   ```
