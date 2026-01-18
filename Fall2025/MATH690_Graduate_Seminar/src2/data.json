@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "title": "Kral Lear",
+    "city": "Istanbul",
+    "location": "Zorlu PSM",
+    "date": "23 Ocak 2026"
+  },
+  {
+    "id": 2,
+    "title": "Cimri",
+    "city": "Ankara",
+    "location": "Devlet Tiyatroları",
+    "date": "15 Şubat 2026"
+  },
+  {
+    "id": 3,
+    "title": "Hırçın Kız",
+    "city": "Istanbul",
+    "location": "Caddebostan Kültür Merkezi",
+    "date": "23 Ocak 2026"
+  },
+  {
+    "id": 4,
+    "title": "Vanya Dayı",
+    "city": "Istanbul",
+    "location": "Moda Sahnesi",
+    "date": "25 Ocak 2026"
+  }
+]

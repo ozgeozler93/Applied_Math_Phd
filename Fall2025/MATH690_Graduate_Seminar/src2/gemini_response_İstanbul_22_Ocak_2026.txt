@@ -1,0 +1,61 @@
+PROMPT:
+
+İstanbul'da 22 Ocak 2026 tarihinde ÖZEL TİYATROLARDA hangi oyunlar var?
+
+ÖNEMLİ MEKANLAR:
+• AKM (Atatürk Kültür Merkezi)
+• Akatlar Kültür Merkezi
+• Zorlu PSM - Turkcell Platinum Sahnesi  
+• Zorlu PSM - % 100 Studio
+• Zorlu PSM - Touché
+• Kanyon Cambazhane
+• DasDas
+• Moda Sahnesi - Büyük Sahne
+• BKM (Beşiktaş Kültür Merkezi)
+• CKM (Caddebostan Kültür Merkezi)
+• Adana 01 Burda PGM
+
+
+ÇOK ÖNEMLİ KURALLAR:
+1. SADECE OYUN ADLARINI ve SAAT BİLGİLERİNİ VER
+2. URL, link, site adı, ".com", ".tr" KESİNLİKLE YAZMA
+3. "İBB", "Devlet Tiyatroları", "olası oyunlar", "kontrol edin" gibi ifadeler KULLANMA
+4. SADECE gerçek özel tiyatro oyunlarını listele
+
+FORMAT ŞÖYLE OLSUN:
+**Akatlar Kültür Merkezi:**
+• 39 Buçuk Basamak - 20:30
+• Korkusuz Salyangoz - 13:00
+
+**Zorlu PSM:**
+• Afife - 20:00
+
+**Küçükçiftlik Park:**
+• Aşk Biter Mi? - 20:30
+
+**Kanyon Cambazhane:**
+• Süper Patates ve Kaçak Bezelye - 13:00
+
+SADECE 22 Ocak 2026 tarihindeki oyunları listele.
+Her oyun için saat bilgisi mutlaka olsun.
+
+
+==================================================
+
+CEVAP:
+22 Ocak 2026 tarihinde İstanbul'daki özel tiyatrolarda sahnelenecek oyunlar:
+
+**AKM (Atatürk Kültür Merkezi):**
+* Aşk Biter Mi?
+
+**Akatlar Kültür Merkezi:**
+* 39 Buçuk Basamak
+
+**Kanyon Cambazhane:**
+* Süper Patates ve Kaçak Bezelye - 13:00
+
+**Zorlu PSM - Turkcell Platinum Sahnesi:**
+* Güneşin Oğlu
+
+**Ümraniye Sahnesi:**
+* Öksüzler - 20:00

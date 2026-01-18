@@ -1,0 +1,12 @@
+{
+  "data": {
+    "success": true,
+    "sehir": "İstanbul",
+    "tarih": "2026-01-23",
+    "yil": "2026",
+    "sorgu": "23 ocak 2026 tarihinde Istanbul'da hangi tiyatrolar var?",
+    "timestamp": "2026-01-16T16:19:51.321593"
+  },
+  "expiry": "2026-01-23T16:19:51.321639",
+  "created": "2026-01-16T16:19:51.321656"
+}

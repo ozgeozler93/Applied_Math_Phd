@@ -1,0 +1,13 @@
+# Environments
+.env
+.venv
+venv/
+__pycache__/
+
+# Secrets
+*.pickle
+credentials.json
+.streamlit/secrets.toml
+
+# Python cache
+*.pyc
