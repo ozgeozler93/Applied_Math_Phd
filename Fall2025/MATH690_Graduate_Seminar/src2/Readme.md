@@ -261,7 +261,109 @@ Proje artık o kadar çok yeteneğe sahipti ki, komut satırı (CLI) arayüzü y
 - **Zorluk:** Streamlit'in "stateful" (durum bilgisi olan) yapısını anlamak ve yönetmek, CLI'daki basit döngüden daha farklı bir düşünme biçimi gerektirdi. Bir butona tıklandığında sayfanın yeniden çizilmesi (rerun) ve `session_state`'in bu döngüde nasıl korunacağı, başlangıçta kafa karıştırıcıydı.
 - **Öğrenim:** İyi bir arayüz, en karmaşık "agent" sistemini bile son kullanıcı için basit ve anlaşılır hale getirebilir. Streamlit gibi araçlar, backend mantığına odaklanmış geliştiricilerin bile hızla prototip ve demo'lar oluşturabilmesi için inanılmaz bir güç sunuyor.
 
-## 3. Genel Değerlendirme ve Gelecek Çalışmalar
+---
+
+## 3. Agent Mimarisi ve Çalışma Prensibi
+
+Bu projenin kalbinde, tek bir monolitik yapı yerine, her biri belirli bir görevde uzmanlaşmış "ajanların" ve "araçların" işbirliği yaptığı bir sistem yatmaktadır. Bu mimari, sistemin hem esnekliğini hem de güvenilirliğini artırmaktadır.
+
+### Çalışma Akışı Şeması
+
+Aşağıdaki şema, kullanıcı sorgusundan nihai eyleme kadar olan tüm süreci özetlemektedir:
+
+```
++-------------------------------------------------------------------------+
+|                                KULLANICI                                |
+|                  (Doğal Dil Sorgusu: "22 ocak istanbul")                 |
++----------------------------------+--------------------------------------+
+                                   |
+                                   v
++-------------------------------------------------------------------------+
+|                      STAGEAGENT (ORKESTRATÖR/ANA PROGRAM)                 |
+|            (Görevi alır, doğru ajanlara delege eder, sonuçları birleştirir) |
++----------------------------------+--------------------------------------+
+                                   |
+                                   v
++-------------------------------------------------------------------------+
+|                         Sorgu Ayrıştırıcı (Parser)                        |
+|                     (Şehir: İstanbul, Tarih: 2026-01-22)                  |
++----------------------------------+--------------------------------------+
+                                   |
++----------------------------------+----------------------------------------------------------+
+| Delege Edilen Veri Toplama Görevleri (Paralel Çalışır)                                      |
+|                                                                                             |
+|    +--------------------------+      +-------------------------------+      +--------------------------+
+|    |   İBB Tiyatroları Ajanı  |      |  Devlet Tiyatroları Ajanı     |      |  Özel Tiyatrolar Ajanı   |
+|    +--------------------------+      +-------------------------------+      +--------------------------+
+|              |                                 |                                 |
+|              v                                 v                                 v
+|    +--------------------------+      +-------------------------------+      +--------------------------+
+|    | Aracı: Web Scraping      |      | Aracı 1: Selenium             |      | Aracı: Google Search     |
+|    | (requests, BeautifulSoup)|      | (JS-yoğun site için)          |      | (LLM ile arama)          |
+|    +--------------------------+      +-------------+-----------------+      +--------------------------+
+|              |                                 | (Başarısız olursa)              |
+|              v                                 v                                 v
+|    [ İBB Web Sitesi ]                +-------------------------------+      [     Google.com       ]
+|                                      | Aracı 2: Google Search        |
+|                                      +-------------------------------+
+|                                                |
+|                                                v
+|                                      [    Biletinial.com     ]
+|
++----------------------------------+----------------------------------------------------------+
+                                   |
+                                   v
++-------------------------------------------------------------------------+
+|                  STAGEAGENT (Gelen verileri birleştirir)                  |
++----------------------------------+--------------------------------------+
+                                   |
+                                   v
++-------------------------------------------------------------------------+
+|                        [ Birleştirilmiş Sonuç Listesi ]                     |
+|                              (Kullanıcıya Sunulur)                        |
++----------------------------------+--------------------------------------+
+                                   ^
+                                   |
++----------------------------------+--------------------------------------+
+|                                KULLANICI                                |
+|           (Seçim: '3 Numaralı Oyunu Takvime Ekle' veya '5 için Video Göster') |
++----------------------------------+--------------------------------------+
+                                   |
+                                   v
++-------------------------------------------------------------------------+
+|                      STAGEAGENT (Yeni görevi alır)                      |
++----------------------------------+--------------------------------------+
+                                   |
+                +------------------+-------------------+
+                |                                      |
+                v                                      v
++----------------------------------+   +-----------------------------------+
+|     Eylem Aracı: Google Calendar     |   Bağlam Aracı: YouTube API         |
++----------------------------------+   +-----------------------------------+
+                |                                      |
+                v                                      v
+      [ Takvime Yeni Etkinlik Ekle ]         [ Video Önerileri Sun ]
+
+
+```
+
+### Mimarinin Açıklaması
+
+1.  **Orkestratör (Orchestrator):** Ana `main()` fonksiyonu gibi çalışan merkezi beyindir. Kullanıcıdan gelen ilk sorguyu alır ve hangi adımların atılması gerektiğine karar verir.
+2.  **Sorgu Ayrıştırıcı (Parser):** "22 ocak istanbul" gibi anlamsız bir metni, makinenin anlayabileceği yapısal verilere (`şehir=İstanbul`, `tarih=2026-01-22`) dönüştüren ilk basit ajandır.
+3.  **Veri Toplama Ajanları (Data Gathering Agents):** Projenin "multi-agent" yapısının temelini oluştururlar. Her biri, farklı bir veri kaynağı ve farklı bir yöntem konusunda uzmanlaşmıştır:
+    *   **İBB Ajanı:** Güvenilir ve yapısı belli bir web sitesi için en verimli yöntem olan **Web Scraping**'i kullanır.
+    *   **Devlet Tiyatroları Ajanı:** JavaScript ile çalışan dinamik bir site için daha güçlü bir araç olan **Selenium**'u kullanır. Bu ajanın zekası, Selenium başarısız olduğunda pes etmeyip bir **yedek plana (Google Search)** başvurmasıdır.
+    *   **Özel Tiyatrolar Ajanı:** Merkezi bir veri kaynağı olmadığı için en esnek araç olan **LLM destekli Google Search**'ü kullanır. Bu ajan, internetin dağınık yapısıyla başa çıkmak için tasarlanmıştır.
+4.  **Eylem ve Bağlam Araçları (Action & Context Tools):** Veri toplandıktan sonra devreye girerler:
+    *   **Google Calendar Aracı:** Sadece bilgi bulmakla kalmaz, kullanıcının dünyasında gerçek bir **eylem** gerçekleştirir (takvime etkinlik ekler).
+    *   **YouTube Aracı:** Mevcut bilgiyi (oyun adı), kullanıcıya daha zengin bir **bağlam** sunmak için yeni bilgilerle (videolar) zenginleştirir.
+
+Bu mimari, her iş için en uygun aracın seçilmesini sağlayarak hem daha doğru sonuçlar elde edilmesine olanak tanır hem de sistemin bir bütün olarak daha yetenekli ve "akıllı" davranmasını sağlar.
+
+---
+
+## 4. Genel Değerlendirme ve Gelecek Çalışmalar
 
 Bu proje, basit bir LLM çağrısından başlayarak, birden fazla "uzman" ajanın işbirliği yaptığı, harici araçlarla (Google, YouTube, Calendar) zenginleştirilmiş ve sonunda kullanıcı dostu bir web arayüzüne sahip hibrit bir sisteme dönüştü. Bu süreç, "agentic design patterns" konusundaki teorik bilgileri pratiğe dökmemi sağladı.
 
