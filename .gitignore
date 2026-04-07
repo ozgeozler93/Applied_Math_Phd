@@ -7,3 +7,4 @@ token.pickle
 __pycache__/
 *.db
 data/
+.env

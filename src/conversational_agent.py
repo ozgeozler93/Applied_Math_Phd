@@ -28378,7 +28378,7 @@ from dotenv import load_dotenv
 from litellm import completion
 import json
 
-from database import TheaterDatabase
+from src.database import TheaterDatabase
 from src.recommender import ImprovedPlayRecommender
 
 # Suppress pydantic warnings
@@ -28386,7 +28386,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
 # Try to import calendar agent (optional)
 try:
-    from calendar_agent import CalendarAgent
+    from src.calendar_agent import CalendarAgent
     CALENDAR_AVAILABLE = True
 except ImportError:
     CALENDAR_AVAILABLE = False
@@ -28394,7 +28394,7 @@ except ImportError:
 
 # Try to import Tavily agent (optional)
 try:
-    from tavily_agent import TavilySearchAgent
+    from src.tavily_agent import TavilySearchAgent
     TAVILY_AVAILABLE = True
 except ImportError:
     TAVILY_AVAILABLE = False
@@ -28402,7 +28402,7 @@ except ImportError:
 
 # Try to import Hybrid Search Agent (NEW - Scraping + Tavily)
 try:
-    from hybrid_search_agent import HybridSearchAgent
+    from src.hybrid_search_agent import HybridSearchAgent
     HYBRID_AVAILABLE = True
 except ImportError:
     HYBRID_AVAILABLE = False
